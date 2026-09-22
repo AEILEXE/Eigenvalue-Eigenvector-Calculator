@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eigenvalue &amp; Eigenvector Calculator</title>
+<meta name="description" content="Calculate eigenvalues, eigenvectors, and multiplicities from any square matrix, directly in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<header class="site-header">
+  <div class="container">
+    <div class="hero-card">
+      <span class="hero-glyph hero-glyph--tl" aria-hidden="true">&#955;</span>
+      <span class="hero-glyph hero-glyph--br" aria-hidden="true">&#955;</span>
+      <div class="hero-content">
+        <p class="brand-logo">Eigenvalue</p>
+        <h1>Eigenvalue &amp; Eigenvector Calculator</h1>
+        <p class="site-subtitle">Calculate eigenvalues, eigenvectors, and multiplicities from any square matrix.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="main-content" class="container">
+
+  <section class="info-card" aria-labelledby="how-it-works-heading">
+    <h2 id="how-it-works-heading">How it works</h2>
+    <ol class="info-steps">
+      <li><span class="step-text">Enter the matrix size.</span></li>
+      <li><span class="step-text">Fill in every matrix entry.</span></li>
+      <li><span class="step-text">Click Calculate.</span></li>
+      <li><span class="step-text">View the eigenvalues, multiplicities, and corresponding eigenvectors.</span></li>
+    </ol>
+  </section>
+
+  <section class="card" aria-labelledby="size-heading">
+    <h2 id="size-heading"><span class="section-glyph" aria-hidden="true">n</span>1. Matrix Size</h2>
+    <div class="size-input-row">
+      <label for="matrix-size">Matrix size (n)</label>
+      <div class="size-input-controls">
+        <input
+          type="number"
+          id="matrix-size"
+          name="matrix-size"
+          min="1"
+          max="100"
+          step="1"
+          inputmode="numeric"
+          placeholder="e.g. 3"
+          aria-describedby="size-hint">
+        <button
+          type="button"
+          id="create-matrix-btn"
+          class="btn btn-secondary btn-small">
+          Create Matrix
+        </button>
+      </div>
+      <span id="size-hint" class="hint">Enter a whole number from 1 to 100, then click Create Matrix.</span>
+      <p id="large-matrix-notice" class="info-notice" role="status" hidden></p>
+    </div>
+  </section>
+
+  <div class="flow-connector" aria-hidden="true"><span>&#8595;</span></div>
+
+  <p id="error-box" class="error-box" role="alert" aria-live="assertive"></p>
+
+  <section id="matrix-section" class="card card--primary" aria-labelledby="matrix-heading">
+    <h2 id="matrix-heading"><span class="section-glyph" aria-hidden="true">A</span>2. Matrix Entries</h2>
+    <p class="hint">Use Tab, Enter, or the arrow keys to move between cells. Negative and decimal values are supported.</p>
+    <div id="matrix-container" class="matrix-scroll"></div>
+
+    <div class="button-row">
+      <button type="button" id="calculate-btn" class="btn btn-primary">
+        Calculate Eigenvalues &amp; Eigenvectors
+      </button>
+      <button type="button" id="example-btn" class="btn btn-secondary btn-secondary--green">Load Example</button>
+      <button type="button" id="clear-btn" class="btn btn-tertiary">Clear Matrix</button>
+      <span id="calculating-indicator" class="calculating-indicator" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span> Calculating&hellip;
+      </span>
+    </div>
+  </section>
+
+  <section id="results-section" class="results-section" aria-labelledby="results-heading">
+    <div class="flow-connector" aria-hidden="true"><span>&#8595;</span></div>
+    <h2 id="results-heading"><span class="section-glyph" aria-hidden="true">&#955;</span>3. Results</h2>
+
+    <div class="card">
+      <h3>Input Matrix</h3>
+      <div id="input-matrix-display"></div>
+    </div>
+
+    <div class="card">
+      <div class="results-card-header">
+        <h3>Eigenvalues &amp; Eigenvectors</h3>
+        <button type="button" id="copy-btn" class="btn btn-secondary btn-secondary--pink btn-small">Copy Results</button>
+      </div>
+      <div id="eigen-results" class="eigen-results"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>All calculations run locally in your browser. No data is sent to a server.</p>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
