@@ -749,6 +749,9 @@ main.container {
   border-radius: 999px;
   margin-left: 4px;
 }
+.status-badge[hidden] {
+  display: none;
+}
 .status-badge--repeated {
   background: var(--color-repeated-bg);
   color: var(--color-repeated-text);
@@ -756,6 +759,11 @@ main.container {
 .status-badge--defective {
   background: var(--color-defective-bg);
   color: var(--color-defective-text);
+}
+.status-badge--weighted {
+  background: var(--color-green-soft);
+  color: var(--color-green-dark);
+  vertical-align: middle;
 }
 
 .eigen-vectors-label {
@@ -838,6 +846,14 @@ main.container {
 .graph-edge {
   cursor: pointer;
   transition: stroke var(--transition-fast), stroke-width var(--transition-fast);
+}
+
+.graph-edge-weight {
+  cursor: pointer;
+}
+.graph-edge-weight-text {
+  font-family: var(--font-mono);
+  user-select: none;
 }
 
 .graph-vertex-info {

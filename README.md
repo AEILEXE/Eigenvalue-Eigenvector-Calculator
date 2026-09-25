@@ -1,6 +1,6 @@
 # Eigenvalue & Eigenvector Calculator
 
-A browser-based calculator that computes the eigenvalues and eigenvectors of any square matrix. Enter a matrix size, fill in the values, and get the eigenvalues, their multiplicities, and their corresponding eigenvectors — all calculated instantly in your browser, with no data ever sent to a server. When the matrix you enter is a graph Laplacian, the calculator also reconstructs and displays the underlying graph automatically.
+A browser-based calculator that computes the eigenvalues and eigenvectors of any square matrix. Enter a matrix size, fill in the values, and get the eigenvalues, their multiplicities, and their corresponding eigenvectors — all calculated instantly in your browser, with no data ever sent to a server. When the matrix you enter is a graph Laplacian — weighted or unweighted — the calculator also reconstructs and displays the underlying graph automatically, including each edge's weight when the graph is weighted.
 
 **Live Demo:** https://eigenvalueproj.netlify.app/
 
@@ -16,11 +16,11 @@ This tool lets you:
 - Calculate the eigenvector(s) associated with each eigenvalue
 - See the algebraic and geometric multiplicity of each eigenvalue
 - Copy the full set of results as plain text
-- Automatically visualize the graph behind a Laplacian matrix, when the matrix you entered is one
+- Automatically visualize the graph behind a Laplacian matrix, when the matrix you entered is one — including edge weights, when the matrix is a weighted Laplacian
 
 In linear algebra, an eigenvalue and eigenvector pair describes a direction that a matrix only stretches or shrinks, without changing — a property used throughout engineering, physics, computer graphics, and data science (for example, in vibration analysis, stability analysis, and principal component analysis). This calculator handles that computation for you, including matrices whose eigenvalues turn out to be complex numbers.
 
-A graph Laplacian is a special square matrix (`L = D - A`, degree matrix minus adjacency matrix) built from a graph's vertices and edges; its eigenvalues reveal structural properties of the graph (for example, the number of zero eigenvalues equals the number of connected components). This calculator recognizes valid graph Laplacians automatically and draws the graph they represent alongside the usual eigenvalue results.
+A graph Laplacian is a special square matrix (`L = D - A`, degree matrix minus adjacency matrix) built from a graph's vertices and edges; its eigenvalues reveal structural properties of the graph (for example, the number of zero eigenvalues equals the number of connected components). This calculator recognizes valid graph Laplacians automatically — both unweighted and weighted — and draws the graph they represent alongside the usual eigenvalue results.
 
 ---
 
@@ -33,9 +33,10 @@ A graph Laplacian is a special square matrix (`L = D - A`, degree matrix minus a
 - Geometric multiplicity (how many independent eigenvectors an eigenvalue actually has)
 - A "Defective" indicator when an eigenvalue's algebraic and geometric multiplicities differ
 - Automatic Laplacian detection and graph reconstruction, with a clean, interactive SVG visualization
-- Automatic graph type labeling for recognizable shapes (complete, path, cycle, star, disconnected, or empty graphs)
-- Hover and keyboard-focus highlighting of graph vertices and their edges, and click-to-reveal vertex degree
-- Downloadable graph image (SVG) and one-click copying of the graph's vertex/edge summary
+- Automatic detection of **weighted** graph Laplacians, with each edge's weight displayed directly on the graph
+- Automatic graph type labeling for recognizable shapes (complete, path, cycle, star, disconnected, or empty graphs), prefixed with "Weighted" when the graph is weighted
+- Hover and keyboard-focus highlighting of graph vertices and their edges, and click-to-reveal vertex degree (and weighted degree, for weighted graphs)
+- Downloadable graph image (SVG, including edge weight labels) and one-click copying of the graph's vertex/edge summary (including weights)
 - A built-in example matrix you can load with one click
 - One-click clearing of the current matrix
 - One-click copying of the full eigenvalue/eigenvector results as plain text
@@ -113,7 +114,7 @@ After a calculation completes, click **Copy Results** to copy the input matrix, 
 
 ### 8. Graph Visualization (for Laplacian matrices)
 
-If the matrix you calculated is a valid simple-graph Laplacian, a **Graph Visualization** card automatically appears below the eigenvalue results, showing the graph the matrix represents. If it isn't, the card instead shows a short message explaining that graph visualization isn't available for that matrix — the eigenvalue and eigenvector results above are unaffected either way. See [Laplacian Matrix and Graph Visualization](#laplacian-matrix-and-graph-visualization) below for full details.
+If the matrix you calculated is a valid graph Laplacian — unweighted or weighted — a **Graph Visualization** card automatically appears below the eigenvalue results, showing the graph the matrix represents, with edge weights drawn on the graph when it's weighted. If it isn't, the card instead shows a short message explaining specifically why graph visualization isn't available for that matrix — the eigenvalue and eigenvector results above are unaffected either way. See [Laplacian Matrix and Graph Visualization](#laplacian-matrix-and-graph-visualization) below for full details.
 
 ---
 
@@ -179,32 +180,38 @@ L = D - A
 
 where **D** is the diagonal degree matrix (each diagonal entry is the number of edges touching that vertex) and **A** is the adjacency matrix (a 1 in position `[i][j]` means an edge connects vertex i and vertex j, 0 otherwise). The result is a symmetric matrix where every row sums to zero. The Laplacian's eigenvalues describe structural properties of the graph — for example, the eigenvalue 0 always appears, and it appears once for every connected component in the graph.
 
-Whenever you calculate a matrix that fits this pattern, the calculator reconstructs the graph directly from the matrix entries and displays it automatically — you don't need to do anything extra.
+Whenever you calculate a matrix that fits this pattern, the calculator reconstructs the graph directly from the matrix entries and displays it automatically — you don't need to do anything extra. This same idea extends naturally to **weighted** graphs, covered in its own section below.
 
 ### How the Calculator Recognizes a Laplacian
 
-A calculated matrix is treated as a valid simple-graph Laplacian only when **all** of the following hold:
+A calculated matrix is treated as a valid graph Laplacian only when **all** of the following hold:
 
 - It is square (guaranteed by the matrix size you chose).
 - Every entry is a finite real number.
 - It is symmetric (`L[i][j] = L[j][i]` for every pair).
+- Every off-diagonal entry is zero or negative (a positive off-diagonal entry is never valid).
+- Every diagonal entry is non-negative.
 - Every row sums to zero (within a small numerical tolerance).
-- Every diagonal entry is a non-negative whole number.
-- Every off-diagonal entry is either `0` or `-1`.
-- Each diagonal entry equals the count of `-1` entries in that same row (its vertex's degree).
 
-If any of these checks fail, the matrix is not treated as a Laplacian. The eigenvalue and eigenvector results are calculated and shown exactly as normal, and the Graph Visualization card simply displays:
+If any of these checks fail, the matrix is not treated as a Laplacian. The eigenvalue and eigenvector results are calculated and shown exactly as normal, and the Graph Visualization card explains specifically why the matrix was rejected, for example:
 
-> "Graph visualization is unavailable because this matrix is not a valid simple graph Laplacian."
+> "Graph visualization is unavailable: row 2 sums to 3, not 0; every row of a Laplacian matrix must sum to zero."
 
-This is an informational message, not an error — the rest of the calculator continues to work normally.
+or:
+
+> "Graph visualization is unavailable: the matrix is not symmetric (L[1][2] = -2 but L[2][1] = -1), so it cannot represent an undirected graph."
+
+These are informational messages, not errors, and the calculator never tries to silently "fix" or reinterpret an invalid matrix — the rest of the calculator continues to work normally either way.
+
+A matrix that passes these checks is automatically classified as either an **unweighted** or a **weighted** Laplacian (see below) — there is no separate toggle to set; the matrix itself determines which one you get.
 
 ### How the Graph Is Reconstructed
 
 The graph is built directly from the matrix, never from the eigenvalues:
 
 - Each row/column index becomes a vertex, numbered starting from **1** (row/column 1 in the matrix is vertex 1, and so on).
-- For every off-diagonal entry `L[i][j] = -1` (with i < j), one edge is drawn between vertex i and vertex j. Because the matrix is symmetric, the mirrored entry `L[j][i] = -1` is not read again, so each edge is created exactly once.
+- For every off-diagonal entry `L[i][j] < 0` (with i < j), one edge is drawn between vertex i and vertex j, and its weight is the entry's absolute value. Because the matrix is symmetric, the mirrored entry `L[j][i]` is not read again, so each edge is created exactly once.
+- An off-diagonal entry of exactly `0` means there is no edge between that pair of vertices.
 
 For example, the Laplacian
 
@@ -215,15 +222,53 @@ For example, the Laplacian
 -1 -1 -1  3
 ```
 
-reconstructs into 4 vertices, each connected to every other vertex — 6 edges in total (the complete graph K₄).
+reconstructs into 4 vertices, each connected to every other vertex — 6 edges in total (the complete graph K₄), each with weight 1.
+
+### Weighted Graphs
+
+A weighted graph assigns a numerical weight to each edge — for example, a distance, a cost, or a capacity. The calculator recognizes this directly from the matrix, with no separate setting to turn on: whenever the off-diagonal entries of a valid Laplacian aren't all exactly `-1`, the graph is treated as weighted.
+
+For a weighted Laplacian:
+
+- A negative off-diagonal entry represents an edge, and **its absolute value is the edge's weight**. For example, `L[1][2] = -2` means an edge between vertex 1 and vertex 2 with weight `2`.
+- An off-diagonal entry of `0` means there is no edge, exactly as in the unweighted case.
+- Each diagonal entry equals the sum of the weights of every edge touching that vertex (its **weighted degree**), not just the number of edges.
+- The matrix must still be symmetric, and every row must still sum to zero, exactly as with an unweighted Laplacian — these two rules are what make a weighted Laplacian mathematically valid.
+
+For example, the matrix
+
+```
+ 4 -2 -1 -1
+-2  5 -3  0
+-1 -3  4  0
+-1  0  0  1
+```
+
+is a valid weighted Laplacian (every row sums to zero, and it's symmetric) representing 4 vertices and 4 weighted edges: 1–2 with weight 2, 1–3 with weight 1, 1–4 with weight 1, and 2–3 with weight 3. There is no edge between 2–4 or 3–4, because those off-diagonal entries are `0`.
+
+When a weighted Laplacian is detected, the Graph Visualization card:
+
+- Labels the graph as **Weighted Graph**, or, when the underlying shape is confidently recognized, as **Weighted Complete Graph**, **Weighted Path Graph**, **Weighted Cycle Graph**, and so on — the same shape recognition used for unweighted graphs, just with a "Weighted" prefix.
+- Draws each edge's weight directly on the graph, near the middle of the edge.
+- Uses exactly the same layout logic as an unweighted graph of the same shape — weights are a visual layer on top of the same vertices and edges, and never change which vertices are connected.
+
+#### Degree vs. Weighted Degree
+
+These are two different, related concepts:
+
+- **Degree** is the number of edges touching a vertex.
+- **Weighted Degree** is the sum of the weights of the edges touching a vertex.
+
+For an unweighted graph, every edge has weight 1, so the two values are always equal, and only degree is shown. For a weighted graph, they can differ, so clicking a vertex shows both — for example, "Vertex 1 — Degree: 3, Weighted Degree: 4."
 
 ### Reading the Graph
 
 The Graph Visualization card shows:
 
-- **The graph itself** — vertices as numbered circles connected by straight edges, in a fixed, deterministic layout chosen from the graph's recognized shape (see below). The layout is the same every time for the same graph, so it never appears to "jump around."
+- **The graph itself** — vertices as numbered circles connected by straight edges, in a fixed, deterministic layout chosen from the graph's recognized shape (see below). The layout is the same every time for the same graph, so it never appears to "jump around." For a weighted graph, each edge's weight is drawn directly on it.
 - **Vertices** and **Edges** counts.
-- **Graph Type**, shown only when the shape can be identified with certainty, using standard mathematical notation with subscripts: **Complete Graph Kₙ**, **Path Graph Pₙ**, **Cycle Graph Cₙ**, **Star Graph K₁,ₙ₋₁**, **Disconnected Graph (X components)**, **Empty Graph (no edges)**, or **Single Vertex**. If the graph doesn't match one of these recognizable shapes, only the vertex/edge counts are shown, with no invented label.
+- **Graph Type**, shown only when the shape can be identified with certainty, using standard mathematical notation with subscripts: **Complete Graph Kₙ**, **Path Graph Pₙ**, **Cycle Graph Cₙ**, **Star Graph K₁,ₙ₋₁**, **Disconnected Graph (X components)**, **Empty Graph (no edges)**, or **Single Vertex** — prefixed with "Weighted" for a weighted graph (for example, **Weighted Path Graph Pₙ**). If the graph doesn't match one of these recognizable shapes, an unweighted graph shows only the vertex/edge counts with no invented label, while a weighted graph still shows **Weighted Graph**, since the edge weights themselves remain useful information even without a recognized shape.
+- A small **Weighted Graph** badge appears next to the Graph Visualization heading whenever the current graph is weighted, so it's clear at a glance without reading every edge.
 - Disconnected graphs are drawn exactly as disconnected — the calculator never adds edges to force components together.
 
 ### Layout by Graph Shape
@@ -246,17 +291,17 @@ Path and cycle detection follows the graph's actual connections (not just vertex
 ### Graph Interaction
 
 - **Hover** (or keyboard-focus with Tab) a vertex to highlight it and every edge connected to it.
-- **Hover** an edge to highlight that edge on its own.
-- **Click** a vertex (or press Enter/Space while it's focused) to show its degree in a line below the graph, for example "Vertex 1 — degree 3."
-- These interactions add convenience; none of them are required to read the graph — the vertex/edge counts, graph type, and the drawing itself are always visible without hovering or clicking anything.
+- **Hover** an edge, or its weight label, to highlight that edge on its own — its weight label is emphasized at the same time, and a tooltip shows the edge and its weight (for example, "Edge 1-2, Weight: 2").
+- **Click** a vertex (or press Enter/Space while it's focused) to show its degree in a line below the graph — for example "Vertex 1 — degree 3" for an unweighted graph, or "Vertex 1 — Degree: 3, Weighted Degree: 4." for a weighted one.
+- These interactions add convenience; none of them are required to read the graph — the vertex/edge counts, graph type, and the drawing itself (including edge weights) are always visible without hovering or clicking anything.
 
 ### Download Graph
 
-Click **Download Graph** to save the current graph as a standalone `laplacian-graph.svg` file, containing only the graph drawing (vertices, labels, and edges) — not the rest of the page. SVG is a scalable, resolution-independent image format that any modern browser or image editor can open.
+Click **Download Graph** to save the current graph as a standalone `laplacian-graph.svg` file, containing only the graph drawing (vertices, labels, and edges) — not the rest of the page. For a weighted graph, the edge weight labels are included in the downloaded file exactly as shown on screen. SVG is a scalable, resolution-independent image format that any modern browser or image editor can open.
 
 ### Copy Graph Information
 
-Click **Copy Graph Info** to copy a plain-text summary of the graph to your clipboard, for example:
+Click **Copy Graph Info** to copy a plain-text summary of the graph to your clipboard. For an unweighted graph:
 
 ```
 Vertices: 4
@@ -272,13 +317,28 @@ Edges:
 3-4
 ```
 
+For a weighted graph, each edge line also includes its weight:
+
+```
+Vertices: 4
+Edges: 4
+Graph Type: Weighted Graph
+
+Edges:
+1-2: weight 2
+1-3: weight 1
+1-4: weight 1
+2-3: weight 3
+```
+
 ### Large and Dense Graphs
 
 The graph feature supports the calculator's full matrix size range, 1×1 through 100×100. As graphs get larger and denser:
 
 - Vertex numbers are shown as permanent labels for smaller graphs, and on hover/focus only for graphs with more than roughly 45 vertices, to keep the drawing from becoming cluttered.
+- Edge weight labels follow the same threshold: for a weighted graph with more than roughly 45 vertices, weights are available by hovering an edge (via the tooltip) rather than as permanent on-graph labels, again to avoid clutter.
 - Edges are drawn with reduced opacity once a graph has many edges, so a very dense graph (for example, a complete graph with dozens of vertices) reads as a legible density pattern instead of a single solid, unreadable shape.
-- A short note appears under large or dense graphs noting that individual edges may be hard to distinguish visually. The vertex and edge counts and the graph type (when identifiable) always remain accurate and readable regardless of density.
+- A short note appears under large or dense graphs explaining what changed — for example, that individual edges may be hard to distinguish visually, or that edge weights are shown on hover instead of as permanent labels. The vertex and edge counts and the graph type (when identifiable) always remain accurate and readable regardless of density.
 - The eigenvalue/eigenvector calculation itself is unaffected by graph size or density — the two features operate independently.
 
 ---
@@ -293,8 +353,8 @@ The graph feature supports the calculator's full matrix size range, 1×1 through
 | Load Example | Loads a built-in 2×2 example matrix |
 | Clear Matrix | Empties all cell values in the current matrix |
 | Copy Results | Copies the matrix and calculated results to the clipboard |
-| Copy Graph Info | Copies the vertex/edge summary of the reconstructed graph to the clipboard |
-| Download Graph | Downloads the current graph as an SVG image file |
+| Copy Graph Info | Copies the vertex/edge summary of the reconstructed graph to the clipboard (including edge weights, for a weighted graph) |
+| Download Graph | Downloads the current graph as an SVG image file (including edge weight labels, for a weighted graph) |
 
 ---
 
@@ -334,7 +394,7 @@ No external math, linear algebra, or graph/charting library is used. The eigenva
 5. The matrix is reduced to a simpler equivalent form, then processed with a numerical algorithm to find its eigenvalues.
 6. For each eigenvalue found, the calculator determines its multiplicity and computes its associated eigenvector(s).
 7. The eigenvalues, multiplicities, and eigenvectors are formatted and displayed on the page.
-8. Independently of that calculation, the same matrix is checked against the Laplacian rules described above. If it qualifies, its vertices and edges are reconstructed and drawn as an SVG graph; if not, an informational message is shown in its place.
+8. Independently of that calculation, the same matrix is checked against the Laplacian rules described above. If it qualifies, its vertices and edges (and, for a weighted Laplacian, each edge's weight) are reconstructed and drawn as an SVG graph; if not, an informational message explaining why is shown in its place.
 
 All of this happens locally in the browser — no matrix data is ever transmitted anywhere.
 
@@ -399,7 +459,8 @@ The same approach works on any other static host (GitHub Pages, Vercel, Cloudfla
 - Very large matrices (approaching 100×100) take noticeably longer to calculate and require entering a large number of values by hand.
 - All matrix entries must be real numbers; the matrix itself must be square (the interface only allows square matrices, from 1×1 to 100×100).
 - The calculator runs entirely in the browser using standard JavaScript, so performance depends on the device and browser being used.
-- Graph visualization only supports **simple** graphs: unweighted, undirected, with no self-loops and no multiple edges between the same pair of vertices, matching the strict `0`/`-1` off-diagonal rule described above. Weighted Laplacians, directed graphs, and multigraphs are not recognized as valid Laplacians and will not produce a graph.
-- Graph type labeling (Complete, Path, Cycle, Star, Disconnected, Empty, Single Vertex) only covers those specific, unambiguous shapes. A valid graph that doesn't match one of them is still drawn correctly, just without a type label — the vertex and edge counts are always shown either way.
+- Graph visualization supports **simple** graphs, both unweighted and weighted: undirected, with no self-loops and no multiple edges between the same pair of vertices, matching the symmetric, zero-row-sum Laplacian rules described above. Directed graphs and multigraphs are not recognized as valid Laplacians and will not produce a graph.
+- Edge weights must be positive numbers (a negative off-diagonal entry's absolute value). The calculator never invents or infers a weighted graph from a matrix that fails the Laplacian rules — if validation fails, no graph is shown, and the specific reason is explained instead.
+- Graph type labeling (Complete, Path, Cycle, Star, Disconnected, Empty, Single Vertex) only covers those specific, unambiguous shapes. An unweighted graph that doesn't match one of them is still drawn correctly, just without a type label; a weighted graph that doesn't match one still shows the generic **Weighted Graph** label, since the weights themselves remain informative even without a recognized shape. The vertex and edge counts are always shown either way.
 - The graph layout is a fixed circular arrangement; vertices cannot be manually dragged or rearranged. This keeps the layout deterministic and reliable at every size, including very large graphs, at the cost of custom positioning.
 - For graphs with a large number of edges, individual edges can be visually difficult to trace by eye even though every edge is drawn correctly — the vertex/edge counts and graph type remain accurate regardless.

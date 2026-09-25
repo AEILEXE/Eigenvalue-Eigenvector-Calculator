@@ -345,12 +345,13 @@
   var graphInfo = document.getElementById('graph-info');
   var graphVertexInfo = document.getElementById('graph-vertex-info');
   var graphDensityNote = document.getElementById('graph-density-note');
+  var graphWeightedBadge = document.getElementById('graph-weighted-badge');
   var copyGraphBtn = document.getElementById('copy-graph-btn');
   var downloadGraphBtn = document.getElementById('download-graph-btn');
 
   var currentN = 0;
   var lastResults = null; // holds { matrix, n, groups } for copy functionality
-  var lastGraph = null; // holds { n, edges, type } for the graph feature
+  var lastGraph = null; // holds { n, edges, type, weighted } for the graph feature
 
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
@@ -370,6 +371,7 @@
     graphInfo.innerHTML = '';
     graphVertexInfo.textContent = '';
     graphDensityNote.hidden = true;
+    graphWeightedBadge.hidden = true;
     lastGraph = null;
   }
 
@@ -693,55 +695,77 @@
   var LAPLACIAN_TOL = 1e-6;
   var SVG_NS = 'http://www.w3.org/2000/svg';
 
-  /* A matrix L is treated as a simple-graph Laplacian (L = D - A) when it is
-     symmetric, every row sums to zero, every off-diagonal entry is 0 or -1,
-     and every diagonal entry equals the count of -1 entries in that row. */
-  function isValidLaplacian(matrix, n) {
-    if (!n || n < 1) return false;
+  /* A matrix L is a valid (weighted or unweighted) simple-graph Laplacian
+     (L = D - A) when it is symmetric, every off-diagonal entry is zero or
+     negative (a negative entry's magnitude is the edge weight), every
+     diagonal entry is non-negative, and every row sums to zero. An
+     unweighted Laplacian is simply the special case where every edge
+     weight equals 1 -- so this single analysis handles both, and the
+     original K4-style 0/-1 matrices validate exactly as before. Returns
+     either { ok: true, edges: [[i, j, weight], ...], weighted: bool } or
+     { ok: false, reason: <human-readable explanation> } -- never silently
+     "fixes" or reinterprets an invalid matrix. */
+  function laplacianAnalysis(matrix, n) {
+    if (!n || n < 1) return { ok: false, reason: 'the matrix is empty.' };
     var i, j;
     for (i = 0; i < n; i++) {
       for (j = 0; j < n; j++) {
-        if (!isFinite(matrix[i][j])) return false;
+        if (!isFinite(matrix[i][j])) return { ok: false, reason: 'the matrix contains a non-finite value.' };
       }
     }
     for (i = 0; i < n; i++) {
       for (j = i + 1; j < n; j++) {
-        if (Math.abs(matrix[i][j] - matrix[j][i]) > LAPLACIAN_TOL) return false;
+        if (Math.abs(matrix[i][j] - matrix[j][i]) > LAPLACIAN_TOL) {
+          return {
+            ok: false,
+            reason: 'the matrix is not symmetric (L[' + (i + 1) + '][' + (j + 1) + '] = ' + formatReal(matrix[i][j]) +
+              ' but L[' + (j + 1) + '][' + (i + 1) + '] = ' + formatReal(matrix[j][i]) + '), so it cannot represent an undirected graph.'
+          };
+        }
       }
     }
     for (i = 0; i < n; i++) {
       for (j = 0; j < n; j++) {
         if (i === j) continue;
-        var v = matrix[i][j];
-        if (Math.abs(v) > LAPLACIAN_TOL && Math.abs(v + 1) > LAPLACIAN_TOL) return false;
+        if (matrix[i][j] > LAPLACIAN_TOL) {
+          return {
+            ok: false,
+            reason: 'entry L[' + (i + 1) + '][' + (j + 1) + '] = ' + formatReal(matrix[i][j]) +
+              ' is positive; off-diagonal entries of a Laplacian must be zero or negative (a negative value represents an edge weight).'
+          };
+        }
+      }
+      if (matrix[i][i] < -LAPLACIAN_TOL) {
+        return {
+          ok: false,
+          reason: 'diagonal entry L[' + (i + 1) + '][' + (i + 1) + '] is negative; Laplacian diagonal entries must be non-negative.'
+        };
       }
     }
     for (i = 0; i < n; i++) {
-      var offDiagCount = 0;
       var rowSum = 0;
-      for (j = 0; j < n; j++) {
-        rowSum += matrix[i][j];
-        if (j !== i && Math.abs(matrix[i][j] + 1) <= LAPLACIAN_TOL) offDiagCount++;
+      for (j = 0; j < n; j++) rowSum += matrix[i][j];
+      if (Math.abs(rowSum) > LAPLACIAN_TOL * Math.max(1, n)) {
+        return {
+          ok: false,
+          reason: 'row ' + (i + 1) + ' sums to ' + formatReal(rowSum) + ', not 0; every row of a Laplacian matrix must sum to zero.'
+        };
       }
-      var diag = matrix[i][i];
-      if (diag < -LAPLACIAN_TOL) return false;
-      if (Math.abs(diag - Math.round(diag)) > LAPLACIAN_TOL) return false;
-      if (Math.abs(diag - offDiagCount) > LAPLACIAN_TOL) return false;
-      if (Math.abs(rowSum) > LAPLACIAN_TOL * Math.max(1, n)) return false;
     }
-    return true;
-  }
 
-  /* Edges come only from L[i][j] = -1 (i < j), so the symmetric L[j][i] = -1
-     entry never produces a second, duplicate edge. */
-  function buildGraphEdges(matrix, n) {
     var edges = [];
-    for (var i = 0; i < n; i++) {
-      for (var j = i + 1; j < n; j++) {
-        if (Math.abs(matrix[i][j] + 1) <= LAPLACIAN_TOL) edges.push([i + 1, j + 1]);
+    var weighted = false;
+    for (i = 0; i < n; i++) {
+      for (j = i + 1; j < n; j++) {
+        var val = matrix[i][j];
+        if (val < -LAPLACIAN_TOL) {
+          var w = -val;
+          edges.push([i + 1, j + 1, w]);
+          if (Math.abs(w - 1) > LAPLACIAN_TOL) weighted = true;
+        }
       }
     }
-    return edges;
+    return { ok: true, edges: edges, weighted: weighted };
   }
 
   function computeDegrees(n, edges) {
@@ -751,6 +775,17 @@
       deg[e[1] - 1]++;
     });
     return deg;
+  }
+
+  /* Weighted degree: sum of incident edge weights (distinct from plain
+     degree, which is the count of incident edges). */
+  function computeWeightedDegrees(n, edges) {
+    var wd = new Array(n).fill(0);
+    edges.forEach(function (e) {
+      wd[e[0] - 1] += e[2];
+      wd[e[1] - 1] += e[2];
+    });
+    return wd;
   }
 
   function countComponents(n, edges) {
@@ -1028,12 +1063,13 @@
     return 0.9;
   }
 
-  function buildGraphSVG(n, edges, degrees) {
+  function buildGraphSVG(n, edges, degrees, weighted, weightedDegrees) {
     var size = 520;
     var center = size / 2;
     var params = graphVisualParams(n);
     var pts = computeLayoutPoints(n, edges, size, params.r);
     var baseOpacity = edgeOpacityForCount(edges.length);
+    var showWeightLabels = weighted && params.showLabels;
 
     var styles = getComputedStyle(document.documentElement);
     function cssVar(name, fallback) {
@@ -1058,17 +1094,21 @@
 
     var titleEl = svgEl('title');
     titleEl.textContent = 'Graph with ' + n + ' vert' + (n === 1 ? 'ex' : 'ices') + ' and ' + edges.length +
-      ' edge' + (edges.length === 1 ? '' : 's') + ', reconstructed from the Laplacian matrix.';
+      ' edge' + (edges.length === 1 ? '' : 's') + ', reconstructed from the Laplacian matrix.' +
+      (weighted ? ' Edge weights are shown.' : '');
     svg.appendChild(titleEl);
     svg.appendChild(svgEl('rect', { x: 0, y: 0, width: size, height: size, fill: colorNodeFill, rx: 14 }));
 
     var edgeLayer = svgEl('g', { class: 'graph-edges' });
     var nodeLayer = svgEl('g', { class: 'graph-nodes' });
     var adjacency = {};
+    var edgeWeightGroups = {};
+    var edgeLineByKey = {};
     for (var v = 1; v <= n; v++) adjacency[v] = [];
 
     edges.forEach(function (e) {
       var a = pts[e[0]], b = pts[e[1]];
+      var edgeKey = e[0] + '-' + e[1];
       var line = svgEl('line', {
         x1: a.x.toFixed(2), y1: a.y.toFixed(2),
         x2: b.x.toFixed(2), y2: b.y.toFixed(2),
@@ -1076,14 +1116,48 @@
         'stroke-width': params.strokeWidth,
         'stroke-opacity': baseOpacity,
         'stroke-linecap': 'round',
-        class: 'graph-edge'
+        class: 'graph-edge',
+        'data-edge': edgeKey
       });
       var edgeTitle = svgEl('title');
-      edgeTitle.textContent = 'Edge ' + e[0] + '-' + e[1];
+      edgeTitle.textContent = weighted
+        ? ('Edge ' + e[0] + '-' + e[1] + '\nWeight: ' + formatReal(e[2]))
+        : ('Edge ' + e[0] + '-' + e[1]);
       line.appendChild(edgeTitle);
       edgeLayer.appendChild(line);
       adjacency[e[0]].push(line);
       adjacency[e[1]].push(line);
+      edgeLineByKey[edgeKey] = line;
+
+      if (showWeightLabels) {
+        var mx = (a.x + b.x) / 2;
+        var my = (a.y + b.y) / 2;
+        var wStr = formatReal(e[2]);
+        var fSize = Math.max(params.fontSize - 1, 9);
+        var boxW = Math.max(wStr.length * fSize * 0.62 + 8, fSize + 8);
+        var boxH = fSize + 6;
+        var weightGroup = svgEl('g', { class: 'graph-edge-weight', 'data-edge': edgeKey });
+        var weightRect = svgEl('rect', {
+          x: (mx - boxW / 2).toFixed(2), y: (my - boxH / 2).toFixed(2),
+          width: boxW.toFixed(2), height: boxH.toFixed(2),
+          rx: 4, fill: colorNodeFill, 'fill-opacity': 0.92,
+          stroke: colorEdge, 'stroke-width': 1
+        });
+        var weightText = svgEl('text', {
+          x: mx.toFixed(2), y: my.toFixed(2),
+          'text-anchor': 'middle', 'dominant-baseline': 'central',
+          'font-size': fSize, 'font-weight': 600,
+          fill: colorLabel, class: 'graph-edge-weight-text'
+        });
+        weightText.textContent = wStr;
+        var weightTitle = svgEl('title');
+        weightTitle.textContent = 'Edge ' + e[0] + '-' + e[1] + '\nWeight: ' + wStr;
+        weightGroup.appendChild(weightTitle);
+        weightGroup.appendChild(weightRect);
+        weightGroup.appendChild(weightText);
+        edgeLayer.appendChild(weightGroup);
+        edgeWeightGroups[edgeKey] = { rect: weightRect, text: weightText };
+      }
     });
 
     var vertexGroups = {};
@@ -1129,6 +1203,13 @@
       line.setAttribute('stroke', on ? colorHighlight : colorEdge);
       line.setAttribute('stroke-width', on ? (params.strokeWidth + 1.4) : params.strokeWidth);
       line.setAttribute('stroke-opacity', on ? 1 : baseOpacity);
+      var key = line.getAttribute('data-edge');
+      var wg = key && edgeWeightGroups[key];
+      if (wg) {
+        wg.rect.setAttribute('stroke', on ? colorHighlight : colorEdge);
+        wg.rect.setAttribute('stroke-width', on ? 1.6 : 1);
+        wg.text.setAttribute('fill', on ? colorHighlight : colorLabel);
+      }
     }
     function setVertexHighlight(vid, on) {
       var g = vertexGroups[vid];
@@ -1147,13 +1228,23 @@
       var vg = closestClass(evt.target, 'graph-vertex');
       if (vg) { setVertexHighlight(parseInt(vg.getAttribute('data-vertex'), 10), true); return; }
       var el = closestClass(evt.target, 'graph-edge');
-      if (el) setEdgeHighlight(el, true);
+      if (el) { setEdgeHighlight(el, true); return; }
+      var wl = closestClass(evt.target, 'graph-edge-weight');
+      if (wl) {
+        var wlLine = edgeLineByKey[wl.getAttribute('data-edge')];
+        if (wlLine) setEdgeHighlight(wlLine, true);
+      }
     });
     svg.addEventListener('mouseout', function (evt) {
       var vg = closestClass(evt.target, 'graph-vertex');
       if (vg) { setVertexHighlight(parseInt(vg.getAttribute('data-vertex'), 10), false); return; }
       var el = closestClass(evt.target, 'graph-edge');
-      if (el) setEdgeHighlight(el, false);
+      if (el) { setEdgeHighlight(el, false); return; }
+      var wl = closestClass(evt.target, 'graph-edge-weight');
+      if (wl) {
+        var wlLine = edgeLineByKey[wl.getAttribute('data-edge')];
+        if (wlLine) setEdgeHighlight(wlLine, false);
+      }
     });
     svg.addEventListener('focusin', function (evt) {
       var vg = closestClass(evt.target, 'graph-vertex');
@@ -1165,7 +1256,12 @@
     });
 
     function activateVertex(vid) {
-      graphVertexInfo.textContent = 'Vertex ' + vid + ' — degree ' + (degrees[vid - 1] || 0) + '.';
+      if (weighted) {
+        graphVertexInfo.textContent = 'Vertex ' + vid + ' — Degree: ' + (degrees[vid - 1] || 0) +
+          ', Weighted Degree: ' + formatReal((weightedDegrees && weightedDegrees[vid - 1]) || 0) + '.';
+      } else {
+        graphVertexInfo.textContent = 'Vertex ' + vid + ' — degree ' + (degrees[vid - 1] || 0) + '.';
+      }
     }
     svg.addEventListener('click', function (evt) {
       var vg = closestClass(evt.target, 'graph-vertex');
@@ -1181,10 +1277,12 @@
   }
 
   function renderGraphSection(matrix, n) {
-    if (!isValidLaplacian(matrix, n)) {
+    var analysis = laplacianAnalysis(matrix, n);
+    if (!analysis.ok) {
       graphWrap.hidden = true;
       graphUnavailable.hidden = false;
-      graphUnavailable.textContent = 'Graph visualization is unavailable because this matrix is not a valid simple graph Laplacian.';
+      graphUnavailable.textContent = 'Graph visualization is unavailable: ' + analysis.reason;
+      graphWeightedBadge.hidden = true;
       lastGraph = null;
       return;
     }
@@ -1193,26 +1291,42 @@
     graphWrap.hidden = false;
     graphVertexInfo.textContent = '';
 
-    var edges = buildGraphEdges(matrix, n);
+    var edges = analysis.edges;
+    var weighted = analysis.weighted;
     var degrees = computeDegrees(n, edges);
-    var svg = buildGraphSVG(n, edges, degrees);
+    var weightedDegrees = weighted ? computeWeightedDegrees(n, edges) : null;
+    var svg = buildGraphSVG(n, edges, degrees, weighted, weightedDegrees);
 
     graphContainer.innerHTML = '';
     graphContainer.appendChild(svg);
+    graphContainer.setAttribute('aria-label', weighted
+      ? 'Weighted graph reconstructed from the Laplacian matrix, with edge weights shown'
+      : 'Graph reconstructed from the Laplacian matrix');
 
-    var typeLabel = classifyGraph(n, edges, degrees);
+    graphWeightedBadge.hidden = !weighted;
+
+    var shapeLabel = classifyGraph(n, edges, degrees);
+    var typeLabel = weighted ? (shapeLabel ? ('Weighted ' + shapeLabel) : 'Weighted Graph') : shapeLabel;
     var infoHtml = '<strong>Vertices:</strong> ' + n + ' &nbsp;•&nbsp; <strong>Edges:</strong> ' + edges.length;
     if (typeLabel) infoHtml += '<br><strong>Graph Type:</strong> ' + escapeHtml(typeLabel);
     graphInfo.innerHTML = infoHtml;
 
+    var params = graphVisualParams(n);
+    var densityMessages = [];
     if (n > 60 || edges.length > 400) {
+      densityMessages.push('This graph is large and dense. Vertex numbers are shown on hover or focus instead of as permanent labels, and individual edges may be hard to distinguish visually.');
+    }
+    if (weighted && !params.showLabels) {
+      densityMessages.push('Edge weights are shown on hover instead of as permanent labels due to the graph size.');
+    }
+    if (densityMessages.length) {
       graphDensityNote.hidden = false;
-      graphDensityNote.textContent = 'This graph is large and dense. Vertex numbers are shown on hover or focus instead of as permanent labels, and individual edges may be hard to distinguish visually.';
+      graphDensityNote.textContent = densityMessages.join(' ');
     } else {
       graphDensityNote.hidden = true;
     }
 
-    lastGraph = { n: n, edges: edges, type: typeLabel };
+    lastGraph = { n: n, edges: edges, type: typeLabel, weighted: weighted };
   }
 
   function buildGraphCopyText() {
@@ -1223,7 +1337,9 @@
     if (lastGraph.type) lines.push('Graph Type: ' + lastGraph.type);
     lines.push('');
     lines.push('Edges:');
-    lastGraph.edges.forEach(function (e) { lines.push(e[0] + '-' + e[1]); });
+    lastGraph.edges.forEach(function (e) {
+      lines.push(lastGraph.weighted ? (e[0] + '-' + e[1] + ': weight ' + formatReal(e[2])) : (e[0] + '-' + e[1]));
+    });
     return lines.join('\n') + '\n';
   }
 
