@@ -249,8 +249,9 @@ is a valid weighted Laplacian (every row sums to zero, and it's symmetric) repre
 When a weighted Laplacian is detected, the Graph Visualization card:
 
 - Labels the graph as **Weighted Graph**, or, when the underlying shape is confidently recognized, as **Weighted Complete Graph**, **Weighted Path Graph**, **Weighted Cycle Graph**, and so on — the same shape recognition used for unweighted graphs, just with a "Weighted" prefix.
-- Draws each edge's weight directly on the graph, near the middle of the edge.
-- Uses exactly the same layout logic as an unweighted graph of the same shape — weights are a visual layer on top of the same vertices and edges, and never change which vertices are connected.
+- Draws each edge's weight directly beside it, offset slightly from the line so the number stays readable rather than sitting on top of it.
+- **Draws each edge's length to reflect its weight** — a smaller weight draws as a visually shorter edge and a larger weight as a visually longer one, so the relative size of every weight is visible at a glance, not just readable from the labels. This is the one respect in which a weighted graph's layout differs from the unweighted case: an unweighted graph (every edge implicitly weight 1) still uses the fixed, equal-length shape templates described below, while a weighted graph stretches or compresses edges by weight while keeping the same vertices connected. The exact pixel length isn't meant to equal the weight number precisely — only its length *relative to the other edges* is meaningful, normalized so a handful of very large or very small weights can't blow up or collapse the drawing. If every edge happens to share the same weight, there's no relative difference to show, so the graph falls back to the plain equal-length layout, exactly like an unweighted graph.
+- Never changes which vertices are connected — the weight only affects how long an edge is drawn, never whether it exists.
 
 #### Degree vs. Weighted Degree
 
@@ -287,6 +288,16 @@ Rather than placing every graph on one generic circle, the calculator recognizes
 | Anything else | A symmetric circular arrangement in vertex-number order, as a reliable general-purpose fallback. |
 
 Path and cycle detection follows the graph's actual connections (not just vertex numbering), so the drawing stays a clean, uncrossed line or ring even if the underlying matrix numbers the vertices out of order along the path or cycle.
+
+The table above describes the **unweighted** layout, where every edge is drawn the same length. A weighted graph keeps the same shape recognition (a weighted path is still drawn as a line, a weighted star still has a centered hub, and so on) but adapts each shape so edge length reflects weight, without changing which vertices are connected:
+
+| Recognized shape (weighted) | How weight changes the layout |
+|---|---|
+| **Path graph** | Still a straight line, but each segment's length along that line is scaled by its edge's weight, so the shortest-weight segment is the shortest stretch of the line and the longest-weight segment is the longest. |
+| **Cycle graph** | Still a ring of the same radius, but vertices are spaced unevenly around it — a lower-weight edge pulls its two vertices closer together along the ring, a higher-weight edge pushes them farther apart — so the ring stays a clean, uncrossed loop at any size while its arc lengths reflect weight. |
+| **Star graph** | The hub still sits dead center, but each leaf sits at a distance from the hub proportional to that leaf's edge weight, instead of all leaves sitting on one fixed circle. |
+| **Complete graph** (small) | Vertices are placed with a lightweight, bounded simulation — edges act like springs pulled toward a length proportional to their weight, while vertices gently repel each other so nothing overlaps — so a weighted K₄, for example, no longer has to be a perfect triangle-plus-center. |
+| **Complete or unrecognized graph** (large) | Kept at the plain equal-length layout. Once a graph is large and dense enough that individual edges are already hard to trace (see [Large and Dense Graphs](#large-and-dense-graphs)), stretching edges by weight on top of that would only add visual noise, not clarity — the weight labels and hover tooltips remain the reliable way to read exact weights at that size. |
 
 ### Graph Interaction
 

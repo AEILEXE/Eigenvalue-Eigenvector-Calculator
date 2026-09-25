@@ -1032,6 +1032,274 @@
     return pts;
   }
 
+  /* ---- Weighted layout: edge length communicates edge weight ----
+     Unweighted graphs keep the shape-aware layout above untouched. When a
+     graph is weighted, edge length instead needs to visually track weight
+     (smaller weight -> shorter edge), which the fixed shape templates
+     above cannot express since they space every edge equally. This uses a
+     lightweight, damped, bounded force-directed relaxation: each edge acts
+     like a spring whose rest length is the weight normalized (min-max)
+     into a fixed pixel range, and vertices repel each other so they don't
+     collide. Normalization keeps a handful of extreme weights from
+     blowing up the drawing, and the simulation always starts from the
+     same shape-aware layout used for unweighted graphs (rather than a
+     random scatter), so a weighted graph still reads as recognizably the
+     same topology, just stretched/compressed by weight. */
+  function desiredEdgeLength(weight, minW, maxW, minLen, maxLen) {
+    if (maxW - minW <= 1e-9) return (minLen + maxLen) / 2;
+    var t = (weight - minW) / (maxW - minW);
+    return minLen + t * (maxLen - minLen);
+  }
+
+  function forceDirectedLayout(vertexIds, subEdges, centerX, centerY, radius, nodeRadius, minW, maxW, seedPositions, pointsOut) {
+    var k = vertexIds.length;
+    if (k === 0) return;
+    if (k === 1) {
+      var only = seedPositions && seedPositions[vertexIds[0]];
+      pointsOut[vertexIds[0]] = only ? { x: only.x, y: only.y } : { x: centerX, y: centerY };
+      return;
+    }
+
+    var minLen = Math.max(nodeRadius * 3.4, radius * 0.42);
+    var maxLen = Math.max(minLen + 1, radius * 1.5);
+
+    var pos = {};
+    var vel = {};
+    vertexIds.forEach(function (v) {
+      var seed = seedPositions && seedPositions[v];
+      pos[v] = seed ? { x: seed.x, y: seed.y } : { x: centerX, y: centerY };
+      vel[v] = { x: 0, y: 0 };
+    });
+
+    var edgeList = subEdges.map(function (e) {
+      return { a: e[0], b: e[1], len: desiredEdgeLength(e[2], minW, maxW, minLen, maxLen) };
+    });
+
+    var iterations = k > 60 ? 180 : 380;
+    var minSeparation = nodeRadius * 2.6;
+    var repulsionStrength = radius * radius * 0.9;
+    var springStrength = 0.06;
+    var centerPull = 0.002;
+    var damping = 0.85;
+    var maxBound = radius + nodeRadius * 0.5;
+
+    for (var iter = 0; iter < iterations; iter++) {
+      var cooling = 1 - iter / iterations;
+      var force = {};
+      vertexIds.forEach(function (v) { force[v] = { x: 0, y: 0 }; });
+
+      for (var i = 0; i < k; i++) {
+        for (var j = i + 1; j < k; j++) {
+          var vi = vertexIds[i], vj = vertexIds[j];
+          var dx = pos[vi].x - pos[vj].x;
+          var dy = pos[vi].y - pos[vj].y;
+          var distSq = dx * dx + dy * dy;
+          var dist = Math.sqrt(distSq) || 0.01;
+          var rep = repulsionStrength / distSq;
+          var fx = (dx / dist) * rep;
+          var fy = (dy / dist) * rep;
+          force[vi].x += fx; force[vi].y += fy;
+          force[vj].x -= fx; force[vj].y -= fy;
+        }
+      }
+
+      edgeList.forEach(function (e) {
+        var pa = pos[e.a], pb = pos[e.b];
+        var dx = pb.x - pa.x, dy = pb.y - pa.y;
+        var dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        var diff = dist - e.len;
+        var fx = (dx / dist) * diff * springStrength;
+        var fy = (dy / dist) * diff * springStrength;
+        force[e.a].x += fx; force[e.a].y += fy;
+        force[e.b].x -= fx; force[e.b].y -= fy;
+      });
+
+      vertexIds.forEach(function (v) {
+        force[v].x += (centerX - pos[v].x) * centerPull;
+        force[v].y += (centerY - pos[v].y) * centerPull;
+      });
+
+      vertexIds.forEach(function (v) {
+        vel[v].x = (vel[v].x + force[v].x * cooling) * damping;
+        vel[v].y = (vel[v].y + force[v].y * cooling) * damping;
+        pos[v].x += vel[v].x;
+        pos[v].y += vel[v].y;
+
+        var ddx = pos[v].x - centerX, ddy = pos[v].y - centerY;
+        var d = Math.sqrt(ddx * ddx + ddy * ddy);
+        if (d > maxBound) {
+          var scale = maxBound / d;
+          pos[v].x = centerX + ddx * scale;
+          pos[v].y = centerY + ddy * scale;
+          vel[v].x *= 0.3; vel[v].y *= 0.3;
+        }
+      });
+    }
+
+    for (var pass = 0; pass < 6; pass++) {
+      for (var i2 = 0; i2 < k; i2++) {
+        for (var j2 = i2 + 1; j2 < k; j2++) {
+          var va = vertexIds[i2], vb = vertexIds[j2];
+          var ddx2 = pos[vb].x - pos[va].x;
+          var ddy2 = pos[vb].y - pos[va].y;
+          var d2 = Math.sqrt(ddx2 * ddx2 + ddy2 * ddy2) || 0.01;
+          if (d2 < minSeparation) {
+            var push = (minSeparation - d2) / 2;
+            var nx = ddx2 / d2, ny = ddy2 / d2;
+            pos[va].x -= nx * push; pos[va].y -= ny * push;
+            pos[vb].x += nx * push; pos[vb].y += ny * push;
+          }
+        }
+      }
+    }
+
+    vertexIds.forEach(function (v) { pointsOut[v] = pos[v]; });
+  }
+
+  /* Path and cycle (and star) shapes have a clean 1-D / radial
+     parametrization, so their weighted layout is computed directly rather
+     than through the general force simulation -- this stays legible at
+     any vertex count (no iterative physics to destabilize a large ring),
+     where letting every vertex repel every other vertex tends to tear a
+     large cycle apart into a tangle instead of a recognizable ring. */
+  function edgeWeightLookup(subEdges) {
+    var map = {};
+    subEdges.forEach(function (e) {
+      map[e[0] + '-' + e[1]] = e[2];
+      map[e[1] + '-' + e[0]] = e[2];
+    });
+    return map;
+  }
+
+  function layoutWeightedPath(order, cx, cy, radius, weightMap, minW, maxW, pointsOut) {
+    var n = order.length;
+    var segLens = [];
+    for (var i = 0; i < n - 1; i++) {
+      segLens.push(desiredEdgeLength(weightMap[order[i] + '-' + order[i + 1]], minW, maxW, 1, 3));
+    }
+    var total = segLens.reduce(function (a, b) { return a + b; }, 0);
+    var span = radius * 2;
+    var scale = total > 0 ? span / total : 0;
+    var x = cx - radius, y = cy;
+    pointsOut[order[0]] = { x: x, y: y };
+    for (i = 0; i < n - 1; i++) {
+      x += segLens[i] * scale;
+      pointsOut[order[i + 1]] = { x: x, y: y };
+    }
+  }
+
+  function layoutWeightedCycle(order, cx, cy, radius, weightMap, minW, maxW, pointsOut) {
+    var n = order.length;
+    var shares = [];
+    for (var i = 0; i < n; i++) {
+      var a = order[i], b = order[(i + 1) % n];
+      shares.push(desiredEdgeLength(weightMap[a + '-' + b], minW, maxW, 1, 3));
+    }
+    var total = shares.reduce(function (a, b) { return a + b; }, 0);
+    var angle = -Math.PI / 2;
+    for (i = 0; i < n; i++) {
+      pointsOut[order[i]] = { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+      angle += (total > 0 ? shares[i] / total : 1 / n) * 2 * Math.PI;
+    }
+  }
+
+  function layoutWeightedStar(hub, leaves, cx, cy, radius, weightMap, minW, maxW, pointsOut) {
+    pointsOut[hub] = { x: cx, y: cy };
+    var minLen = Math.max(radius * 0.35, 18);
+    var maxLen = radius * 0.92;
+    leaves.forEach(function (v, i) {
+      var w = weightMap[hub + '-' + v];
+      var len = desiredEdgeLength(w, minW, maxW, minLen, maxLen);
+      var angle = -Math.PI / 2 + (2 * Math.PI * i) / leaves.length;
+      pointsOut[v] = { x: cx + len * Math.cos(angle), y: cy + len * Math.sin(angle) };
+    });
+  }
+
+  /* Above this size, a fully connected or unrecognized ("generic") shape
+     is too dense for a force simulation to settle into anything legible
+     -- it reads as a hairball whether weighted or not -- so it falls back
+     to the plain equal-length layout instead of spending time distorting
+     something that will look tangled either way. Weight labels are
+     unaffected and still show. */
+  var FORCE_DIRECTED_MAX_K = 14;
+
+  /* Weighted counterpart to computeLayoutPoints: same component/grid
+     structure (so disconnected weighted graphs still separate into their
+     own cells). Path, cycle, and star components get an exact analytic
+     placement so edge length reflects weight while the shape stays
+     clean at any size; small complete/generic components are seeded from
+     their shape-aware layout and relaxed with the bounded force
+     simulation; larger complete/generic components keep the plain
+     equal-length layout, since weight-driven stretching would only add
+     visual noise once a graph is already dense. If every edge has the
+     same weight there is nothing to visualize, so the whole graph defers
+     to the plain shape-aware layout, per the requirement that a uniform
+     weighted graph reads as cleanly as an unweighted one. */
+  function computeWeightedLayoutPoints(n, edges, size, nodeRadius) {
+    var weights = edges.map(function (e) { return e[2]; });
+    var minW = weights.length ? Math.min.apply(null, weights) : 0;
+    var maxW = weights.length ? Math.max.apply(null, weights) : 0;
+    if (maxW - minW <= 1e-9) return computeLayoutPoints(n, edges, size, nodeRadius);
+
+    var center = size / 2;
+    var components = componentsList(n, edges);
+    var pts = {};
+
+    function layoutOneComponent(compVertices, subEdges, cx, cy, radius) {
+      if (compVertices.length <= 1) {
+        pts[compVertices[0]] = { x: cx, y: cy };
+        return;
+      }
+      var shape = detectComponentShape(compVertices, subEdges);
+      var weightMap = edgeWeightLookup(subEdges);
+
+      if (shape.type === 'path') {
+        layoutWeightedPath(shape.order, cx, cy, radius, weightMap, minW, maxW, pts);
+        return;
+      }
+      if (shape.type === 'cycle') {
+        layoutWeightedCycle(shape.order, cx, cy, radius, weightMap, minW, maxW, pts);
+        return;
+      }
+      if (shape.type === 'star') {
+        layoutWeightedStar(shape.hub, shape.leaves, cx, cy, radius, weightMap, minW, maxW, pts);
+        return;
+      }
+
+      if (compVertices.length <= FORCE_DIRECTED_MAX_K) {
+        var seed = {};
+        layoutComponent(shape, compVertices, cx, cy, radius, seed);
+        forceDirectedLayout(compVertices, subEdges, cx, cy, radius, nodeRadius, minW, maxW, seed, pts);
+      } else {
+        layoutComponent(shape, compVertices, cx, cy, radius, pts);
+      }
+    }
+
+    if (components.length <= 1) {
+      var radius = n === 1 ? 0 : center - nodeRadius - 34;
+      layoutOneComponent(components[0] || [1], edges, center, center, radius);
+      return pts;
+    }
+
+    var k = components.length;
+    var cols = Math.ceil(Math.sqrt(k));
+    var rows = Math.ceil(k / cols);
+    var cellW = size / cols;
+    var cellH = size / rows;
+
+    components.forEach(function (comp, idx) {
+      var col = idx % cols;
+      var row = Math.floor(idx / cols);
+      var cellCx = cellW * col + cellW / 2;
+      var cellCy = cellH * row + cellH / 2;
+      var cellRadius = Math.max(12, Math.min(cellW, cellH) / 2 - nodeRadius - 20);
+      var subEdges = edges.filter(function (e) { return comp.indexOf(e[0]) !== -1; });
+      layoutOneComponent(comp, subEdges, cellCx, cellCy, cellRadius);
+    });
+
+    return pts;
+  }
+
   function svgEl(tag, attrs) {
     var el = document.createElementNS(SVG_NS, tag);
     if (attrs) {
@@ -1067,7 +1335,9 @@
     var size = 520;
     var center = size / 2;
     var params = graphVisualParams(n);
-    var pts = computeLayoutPoints(n, edges, size, params.r);
+    var pts = weighted
+      ? computeWeightedLayoutPoints(n, edges, size, params.r)
+      : computeLayoutPoints(n, edges, size, params.r);
     var baseOpacity = edgeOpacityForCount(edges.length);
     var showWeightLabels = weighted && params.showLabels;
 
@@ -1130,8 +1400,14 @@
       edgeLineByKey[edgeKey] = line;
 
       if (showWeightLabels) {
-        var mx = (a.x + b.x) / 2;
-        var my = (a.y + b.y) / 2;
+        var midX = (a.x + b.x) / 2;
+        var midY = (a.y + b.y) / 2;
+        var edgeDx = b.x - a.x, edgeDy = b.y - a.y;
+        var edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy) || 1;
+        var perpX = -edgeDy / edgeLen, perpY = edgeDx / edgeLen;
+        var labelOffset = Math.max(11, params.fontSize * 0.9);
+        var mx = midX + perpX * labelOffset;
+        var my = midY + perpY * labelOffset;
         var wStr = formatReal(e[2]);
         var fSize = Math.max(params.fontSize - 1, 9);
         var boxW = Math.max(wStr.length * fSize * 0.62 + 8, fSize + 8);
