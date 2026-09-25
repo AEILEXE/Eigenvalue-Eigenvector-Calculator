@@ -340,6 +340,7 @@
   var calculatingIndicator = document.getElementById('calculating-indicator');
 
   var graphWrap = document.getElementById('graph-wrap');
+  var graphHint = document.getElementById('graph-hint');
   var graphUnavailable = document.getElementById('graph-unavailable');
   var graphContainer = document.getElementById('graph-container');
   var graphInfo = document.getElementById('graph-info');
@@ -368,6 +369,7 @@
     graphWrap.hidden = true;
     graphUnavailable.hidden = true;
     graphContainer.innerHTML = '';
+    graphContainer.style.aspectRatio = '';
     graphInfo.innerHTML = '';
     graphVertexInfo.textContent = '';
     graphDensityNote.hidden = true;
@@ -1341,6 +1343,60 @@
     var baseOpacity = edgeOpacityForCount(edges.length);
     var showWeightLabels = weighted && params.showLabels;
 
+    /* ---- Adaptive viewport ----
+       The layout above always positions vertices within the same size x
+       size logical space as before (unchanged math). What changes here is
+       only how much of that space is actually shown: a small/simple graph
+       (e.g. a 4-vertex path) otherwise sits as a tiny sliver in the middle
+       of a mostly-empty square. Instead, fit a tight viewBox (and a
+       matching container aspect ratio) around the graph's own content --
+       vertices plus, when shown, weight-label boxes -- so the drawing
+       fills the available space. The aspect ratio is clamped so a very
+       short/degenerate graph (e.g. a single edge) doesn't become an
+       unreasonably thin sliver of its own. */
+    var bbMinX = Infinity, bbMinY = Infinity, bbMaxX = -Infinity, bbMaxY = -Infinity;
+    function growBBox(x0, y0, x1, y1) {
+      if (x0 < bbMinX) bbMinX = x0;
+      if (y0 < bbMinY) bbMinY = y0;
+      if (x1 > bbMaxX) bbMaxX = x1;
+      if (y1 > bbMaxY) bbMaxY = y1;
+    }
+    for (var bv = 1; bv <= n; bv++) {
+      var bp = pts[bv];
+      growBBox(bp.x - params.r, bp.y - params.r, bp.x + params.r, bp.y + params.r);
+    }
+    if (showWeightLabels) {
+      edges.forEach(function (e) {
+        var ba = pts[e[0]], bb = pts[e[1]];
+        var bMidX = (ba.x + bb.x) / 2, bMidY = (ba.y + bb.y) / 2;
+        var bDx = bb.x - ba.x, bDy = bb.y - ba.y;
+        var bLen = Math.sqrt(bDx * bDx + bDy * bDy) || 1;
+        var bPerpX = -bDy / bLen, bPerpY = bDx / bLen;
+        var bOffset = Math.max(11, params.fontSize * 0.9);
+        var bLx = bMidX + bPerpX * bOffset, bLy = bMidY + bPerpY * bOffset;
+        var bWStr = formatReal(e[2]);
+        var bFSize = Math.max(params.fontSize - 1, 9);
+        var bBoxW = Math.max(bWStr.length * bFSize * 0.62 + 8, bFSize + 8);
+        var bBoxH = bFSize + 6;
+        growBBox(bLx - bBoxW / 2, bLy - bBoxH / 2, bLx + bBoxW / 2, bLy + bBoxH / 2);
+      });
+    }
+    if (!isFinite(bbMinX)) { bbMinX = 0; bbMinY = 0; bbMaxX = size; bbMaxY = size; }
+
+    var VIEW_PAD = 26;
+    var MIN_VIEW_DIM = 170;
+    var MAX_VIEW_RATIO = 2.6;
+    var MIN_VIEW_RATIO = 1 / MAX_VIEW_RATIO;
+    var viewW = Math.max(bbMaxX - bbMinX + VIEW_PAD * 2, MIN_VIEW_DIM);
+    var viewH = Math.max(bbMaxY - bbMinY + VIEW_PAD * 2, MIN_VIEW_DIM);
+    var viewRatio = viewW / viewH;
+    if (viewRatio > MAX_VIEW_RATIO) viewH = viewW / MAX_VIEW_RATIO;
+    else if (viewRatio < MIN_VIEW_RATIO) viewW = viewH * MIN_VIEW_RATIO;
+    var bbCx = (bbMinX + bbMaxX) / 2, bbCy = (bbMinY + bbMaxY) / 2;
+    var viewX = bbCx - viewW / 2, viewY = bbCy - viewH / 2;
+
+    graphContainer.style.aspectRatio = (viewW / viewH).toFixed(4) + ' / 1';
+
     var styles = getComputedStyle(document.documentElement);
     function cssVar(name, fallback) {
       var v = styles.getPropertyValue(name);
@@ -1354,7 +1410,7 @@
     var colorHighlightSoft = cssVar('--color-pink-soft', '#fbebf1');
 
     var svg = svgEl('svg', {
-      viewBox: '0 0 ' + size + ' ' + size,
+      viewBox: viewX.toFixed(2) + ' ' + viewY.toFixed(2) + ' ' + viewW.toFixed(2) + ' ' + viewH.toFixed(2),
       width: '100%',
       height: '100%',
       preserveAspectRatio: 'xMidYMid meet',
@@ -1367,7 +1423,10 @@
       ' edge' + (edges.length === 1 ? '' : 's') + ', reconstructed from the Laplacian matrix.' +
       (weighted ? ' Edge weights are shown.' : '');
     svg.appendChild(titleEl);
-    svg.appendChild(svgEl('rect', { x: 0, y: 0, width: size, height: size, fill: colorNodeFill, rx: 14 }));
+    svg.appendChild(svgEl('rect', {
+      x: viewX.toFixed(2), y: viewY.toFixed(2), width: viewW.toFixed(2), height: viewH.toFixed(2),
+      fill: colorNodeFill, rx: 14
+    }));
 
     var edgeLayer = svgEl('g', { class: 'graph-edges' });
     var nodeLayer = svgEl('g', { class: 'graph-nodes' });
@@ -1580,6 +1639,9 @@
       : 'Graph reconstructed from the Laplacian matrix');
 
     graphWeightedBadge.hidden = !weighted;
+    graphHint.textContent = weighted
+      ? 'Hover a vertex or edge to highlight it. Click a vertex to view its degree and weighted degree.'
+      : 'Hover a vertex or edge to highlight it. Click a vertex to see its degree.';
 
     var shapeLabel = classifyGraph(n, edges, degrees);
     var typeLabel = weighted ? (shapeLabel ? ('Weighted ' + shapeLabel) : 'Weighted Graph') : shapeLabel;

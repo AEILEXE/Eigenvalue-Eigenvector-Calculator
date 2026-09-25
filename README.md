@@ -1,417 +1,356 @@
 # Eigenvalue & Eigenvector Calculator
 
-A browser-based calculator that computes the eigenvalues and eigenvectors of any square matrix. Enter a matrix size, fill in the values, and get the eigenvalues, their multiplicities, and their corresponding eigenvectors — all calculated instantly in your browser, with no data ever sent to a server. When the matrix you enter is a graph Laplacian — weighted or unweighted — the calculator also reconstructs and displays the underlying graph automatically, including each edge's weight when the graph is weighted.
+A browser-based **Eigenvalue and Eigenvector Calculator**. Enter any square matrix, and it computes that matrix's eigenvalues, their algebraic and geometric multiplicities, and their corresponding eigenvectors — including complex results and defective (non-diagonalizable) matrices — entirely client-side, with nothing ever sent to a server. When the matrix you enter happens to also be a valid graph Laplacian (weighted or unweighted), the calculator additionally reconstructs and visualizes the graph that matrix represents, as a second, independent feature layered on top of the same input.
 
 **Live Demo:** https://eigenvalueproj.netlify.app/
 
 ---
 
-## Overview
+## 1. Project Title
 
-This tool lets you:
-
-- Choose the size of a square matrix, from 1×1 up to 100×100
-- Enter the matrix values by hand
-- Calculate the matrix's eigenvalues
-- Calculate the eigenvector(s) associated with each eigenvalue
-- See the algebraic and geometric multiplicity of each eigenvalue
-- Copy the full set of results as plain text
-- Automatically visualize the graph behind a Laplacian matrix, when the matrix you entered is one — including edge weights, when the matrix is a weighted Laplacian
-
-In linear algebra, an eigenvalue and eigenvector pair describes a direction that a matrix only stretches or shrinks, without changing — a property used throughout engineering, physics, computer graphics, and data science (for example, in vibration analysis, stability analysis, and principal component analysis). This calculator handles that computation for you, including matrices whose eigenvalues turn out to be complex numbers.
-
-A graph Laplacian is a special square matrix (`L = D - A`, degree matrix minus adjacency matrix) built from a graph's vertices and edges; its eigenvalues reveal structural properties of the graph (for example, the number of zero eigenvalues equals the number of connected components). This calculator recognizes valid graph Laplacians automatically — both unweighted and weighted — and draws the graph they represent alongside the usual eigenvalue results.
+**Eigenvalue & Eigenvector Calculator** (branded in the page header as "CalcuSlay"). It is a static, browser-based web application — there is no installation, account, or backend involved. A user opens the page, types in a matrix, and gets back its full eigen-decomposition.
 
 ---
 
-## Features
+## 2. System Overview
 
-- Square matrix input for any size from 1×1 to 100×100
-- Eigenvalue calculation, including complex (non-real) eigenvalues
-- Eigenvector calculation for every eigenvalue
-- Algebraic multiplicity (how many times an eigenvalue repeats as a root)
-- Geometric multiplicity (how many independent eigenvectors an eigenvalue actually has)
-- A "Defective" indicator when an eigenvalue's algebraic and geometric multiplicities differ
-- Automatic Laplacian detection and graph reconstruction, with a clean, interactive SVG visualization
-- Automatic detection of **weighted** graph Laplacians, with each edge's weight displayed directly on the graph
-- Automatic graph type labeling for recognizable shapes (complete, path, cycle, star, disconnected, or empty graphs), prefixed with "Weighted" when the graph is weighted
-- Hover and keyboard-focus highlighting of graph vertices and their edges, and click-to-reveal vertex degree (and weighted degree, for weighted graphs)
-- Downloadable graph image (SVG, including edge weight labels) and one-click copying of the graph's vertex/edge summary (including weights)
-- A built-in example matrix you can load with one click
-- One-click clearing of the current matrix
-- One-click copying of the full eigenvalue/eigenvector results as plain text
-- Input validation with clear, specific error messages
-- A warning notice for large matrices (50×50 and above)
-- Keyboard navigation between matrix cells (Tab, Enter, and arrow keys)
-- Responsive layout that works on desktop, tablet, and mobile
-- Automatic light/dark theme based on your system preference
-- All calculations run locally in your browser — no data is ever uploaded
+The system solves one core mathematical problem: given a real square matrix `A`, find every eigenvalue `λ` and its associated eigenvector(s) `v` satisfying `A v = λ v`, along with each eigenvalue's algebraic multiplicity (how many times it repeats as a root) and geometric multiplicity (how many independent eigenvectors it actually has).
+
+This is intended for:
+
+- Students and instructors working through linear algebra by hand, who want to check their own eigenvalue/eigenvector calculations.
+- Anyone who needs a quick, no-install eigen-decomposition of a matrix — including matrices too large to comfortably solve by hand (up to 100×100).
+- Anyone exploring graph theory who wants to see the graph a Laplacian matrix represents, without drawing it by hand.
+
+At a high level, the calculator works in two independent stages that both start from the same matrix the user typed in:
+
+1. **Eigen-decomposition** — always runs, for any square matrix. Produces eigenvalues, multiplicities, and eigenvectors.
+2. **Graph analysis** — runs in parallel, independently. If the matrix also happens to satisfy the mathematical definition of a graph Laplacian (see [Section 9](#9-laplacian-detection)), the calculator additionally reconstructs the graph's vertices and edges (with weights, if the Laplacian is weighted) and draws it. If the matrix is not a Laplacian, this second stage simply does not activate — the eigenvalue results are entirely unaffected either way.
+
+The full mathematical implementation behind stage 1 (the QR eigenvalue algorithm, null-space eigenvector computation) and the mathematical portion of stage 2 (Laplacian validation, edge/weight extraction) is documented in detail in **`MATHEMATICAL_CORE.md`**. This document explains the system as a whole — what it does, how the pieces connect, and how to use it — and points to `MATHEMATICAL_CORE.md` wherever the mathematics itself needs full explanation.
 
 ---
 
-## How to Use
+## 3. Major Features
 
-### 1. Choose the Matrix Size
+All of the following are implemented in the current version of the project:
 
-In the **Matrix Size** section, enter a whole number for **n** into the **Matrix size (n)** field. This determines the dimensions of the square matrix you'll fill in.
-
-Examples:
-
-- `2` → a 2×2 matrix
-- `3` → a 3×3 matrix
-- `4` → a 4×4 matrix
-
-Accepted values are whole numbers from **1 to 100**. Once you've typed a size, click **Create Matrix** (or press **Enter** while the field is focused) to build the matrix grid. The grid is not generated automatically while you type — this is intentional, so that typing a larger number like `100` doesn't rebuild the matrix on every keystroke.
-
-If the value you entered is missing, not a whole number, or outside the 1–100 range, an error message appears and no matrix is created.
-
-### 2. Enter the Matrix Values
-
-Once the matrix grid appears, click into each cell and type its value. Negative numbers and decimals are supported (for example `-2.5` or `0.75`).
-
-For a 2×2 matrix, you might enter:
-
-```
-[ 2  1 ]
-[ 0  3 ]
-```
-
-You can move between cells with **Tab**, **Enter**, or the **arrow keys**. Pressing **Enter** in the last cell of the grid automatically triggers the Calculate button.
-
-### 3. Calculate
-
-Click **Calculate Eigenvalues & Eigenvectors** once every cell has a value. The calculator reads the matrix, runs the calculation, and displays the results below. Every cell must contain a valid number — if any cell is empty or contains an invalid value, an error message appears and the calculator will not run.
-
-### 4. Read the Results
-
-For each distinct eigenvalue found, the results section shows:
-
-- **Eigenvalue (λ)** — the numeric value itself
-- **Algebraic Multiplicity** — how many times this eigenvalue is repeated as a root of the matrix
-- **Geometric Multiplicity** — how many independent eigenvectors exist for this eigenvalue
-- **Eigenvector(s)** — the vector, or basis of vectors, associated with the eigenvalue
-
-If an eigenvalue's geometric multiplicity is lower than its algebraic multiplicity, it is labeled **Defective**, meaning the matrix doesn't have a full set of independent eigenvectors for that eigenvalue.
-
-### 5. Load Example
-
-Click **Load Example** to instantly load a ready-made 2×2 matrix:
-
-```
-[ 2  1 ]
-[ 0  3 ]
-```
-
-This is a quick way to see how the calculator works without typing your own values.
-
-### 6. Clear Matrix
-
-Click **Clear Matrix** to empty every cell in the current matrix grid. The matrix size stays the same — only the values are removed. This also clears any results currently on screen.
-
-### 7. Copy Results
-
-After a calculation completes, click **Copy Results** to copy the input matrix, the eigenvalues (with their multiplicities), and all eigenvectors to your clipboard as plain text, ready to paste elsewhere.
-
-### 8. Graph Visualization (for Laplacian matrices)
-
-If the matrix you calculated is a valid graph Laplacian — unweighted or weighted — a **Graph Visualization** card automatically appears below the eigenvalue results, showing the graph the matrix represents, with edge weights drawn on the graph when it's weighted. If it isn't, the card instead shows a short message explaining specifically why graph visualization isn't available for that matrix — the eigenvalue and eigenvector results above are unaffected either way. See [Laplacian Matrix and Graph Visualization](#laplacian-matrix-and-graph-visualization) below for full details.
+- **Matrix size input** — choose any whole-number size from 1×1 to 100×100.
+- **Matrix generation** — clicking Create Matrix (or pressing Enter in the size field) builds an empty input grid of that size.
+- **Matrix value input** — type any real number (integers, decimals, negatives) into each cell.
+- **Eigenvalue calculation** — for any square matrix, real or complex.
+- **Eigenvector calculation** — a basis of eigenvector(s) for every distinct eigenvalue.
+- **Algebraic multiplicity** — how many times each eigenvalue repeats as a root.
+- **Geometric multiplicity** — the dimension of each eigenvalue's eigenspace.
+- **Defective matrix detection** — an eigenvalue is flagged "Defective" when its geometric multiplicity is less than its algebraic multiplicity.
+- **Complex eigenvalues** and **complex eigenvectors** — displayed in `a + bi` form.
+- **Laplacian detection** — automatic recognition of whether the entered matrix is a valid graph Laplacian.
+- **Graph generation** — reconstructing vertices and edges directly from a valid Laplacian.
+- **Graph classification** — automatic labeling of recognizable shapes (complete, path, cycle, star, disconnected, empty, single vertex).
+- **Unweighted graphs** — the original, still-fully-supported case where every edge has weight 1.
+- **Weighted graphs** — automatic detection of non-uniform edge weights, with each weight extracted directly from the Laplacian.
+- **Weighted edge visualization** — edge weight is shown both as an on-graph numeric label and, for recognized/small graphs, as the edge's visual length (see [Section 12](#12-weighted-graphs)).
+- **Graph interaction** — hover/keyboard-focus highlighting of vertices and edges, click-to-reveal degree (and weighted degree).
+- **Graph information** — a live vertex/edge count and graph-type label under the drawing.
+- **Copy Results** — copies the input matrix, eigenvalues, multiplicities, and eigenvectors as plain text.
+- **Copy Graph Info** — copies vertices, edges, graph type, and (for weighted graphs) each edge's weight as plain text.
+- **SVG graph download** — saves the current graph drawing as a standalone `.svg` file.
+- **Load Example** — one click loads a ready-made 2×2 matrix.
+- **Clear/reset** — empties the current matrix's values without changing its size.
+- **Keyboard interaction** — Tab/Enter/Arrow-key navigation between matrix cells, Enter-to-create, Enter-to-calculate.
+- **Responsive interface** — usable from a ~375px-wide phone screen up through desktop.
+- **Accessibility features** — skip link, ARIA labels/roles, live regions, visible focus states, keyboard-operable graph.
+- **Large matrix handling** — an informational notice at 50×50 and above; full support up to 100×100.
 
 ---
 
-## Understanding the Results
+## 4. Technology Stack
 
-### Eigenvalues
+- **HTML5** — page structure (`index.html`).
+- **CSS3** — all styling, responsive layout, and light/dark theming (`style.css`), including `prefers-color-scheme` and `prefers-reduced-motion` media queries.
+- **JavaScript (vanilla, ES5-style, no frameworks or build step)** — all interactivity, the entire eigenvalue engine, and the entire graph engine (`script.js`).
+- **Inline SVG** — the graph visualization is built as SVG DOM elements directly by JavaScript (no charting or graphics library).
 
-An eigenvalue λ is a number that satisfies the equation:
-
-```
-A v = λ v
-```
-
-where **A** is the matrix, **v** is a nonzero vector (the eigenvector), and **λ** is the eigenvalue. In other words, when the matrix is applied to its eigenvector, the result is the same vector scaled by λ — its direction doesn't change.
-
-### Eigenvectors
-
-An eigenvector is the vector **v** in the equation above. It represents a direction that the matrix only stretches, shrinks, or flips — it does not rotate it into a different direction.
-
-### Algebraic Multiplicity
-
-The algebraic multiplicity of an eigenvalue is how many times it appears as a repeated root when solving for the matrix's eigenvalues. For example, an eigenvalue with algebraic multiplicity 2 means the matrix has that same eigenvalue counted twice.
-
-### Geometric Multiplicity
-
-The geometric multiplicity of an eigenvalue is the number of independent eigenvectors associated with it. This can be equal to or less than the algebraic multiplicity, but never greater. When it's less, the calculator labels that eigenvalue as **Defective**.
-
-### Complex Eigenvalues
-
-Not every matrix has purely real eigenvalues — some produce complex results. The calculator fully supports this and displays complex eigenvalues and eigenvectors in the form:
-
-```
-a + bi
-```
-
-For example, a result might appear as `i` or `-i`, or as a combined value such as `1 + 2i`.
+There is **no backend, server, or database** — the whole application is static files served to a browser, and every calculation happens client-side. No external mathematics, linear-algebra, or graphing library is used anywhere; the QR eigenvalue algorithm, the null-space solver, and the graph logic are all original code in `script.js` (see `MATHEMATICAL_CORE.md`). The project does **not** run Python, or any other server-side language, in the browser — it is JavaScript from top to bottom.
 
 ---
 
-## Example
+## 5. System Architecture
 
-Given the matrix:
+**Eigenvalue / eigenvector path:**
 
 ```
-A =
-[ 2  1 ]
-[ 0  3 ]
+User
+  ↓
+HTML Interface (index.html: matrix-size field, matrix grid, Calculate button)
+  ↓
+JavaScript Event Handling (script.js: click/keydown listeners)
+  ↓
+Matrix Input (readMatrix(): validated n×n array of real numbers)
+  ↓
+Mathematical Engine (computeEigen → eigenvaluesQR → groupEigenvalues → nullspace)
+  ↓
+Eigenvalues / Eigenvectors / Multiplicities
+  ↓
+Results (rendered into the page)
 ```
 
-The calculator returns two eigenvalues: **2** and **3**, each with algebraic and geometric multiplicity 1, along with their corresponding eigenvectors. This is the same matrix used by the **Load Example** button.
+**Graph path (runs independently, from the same matrix):**
+
+```
+Matrix
+  ↓
+Laplacian Analysis (laplacianAnalysis: validity + edge/weight extraction)
+  ↓
+Graph Data (edges, weights, degree, weighted degree, connected components)
+  ↓
+Graph Classification (classifyGraph: Kn / Pn / Cn / star / disconnected / etc.)
+  ↓
+Graph Layout (computeLayoutPoints or computeWeightedLayoutPoints: vertex coordinates)
+  ↓
+SVG Visualization (buildGraphSVG: the actual drawn graph)
+  ↓
+User Interaction (hover, click, copy, download)
+```
+
+**Which parts are which:**
+
+| Layer | Examples | Nature |
+|---|---|---|
+| **Mathematical** | `eigenvaluesQR`, `nullspace`, `groupEigenvalues`, `laplacianAnalysis` | Pure computation on numbers; no DOM, no pixels. Fully documented in `MATHEMATICAL_CORE.md`. |
+| **Data processing** | `computeDegrees`, `computeWeightedDegrees`, `countComponents`, `classifyGraph` | Derives structured graph data (degree, components, shape label) from the mathematical output above; still no pixels. |
+| **Presentation / visualization** | `computeLayoutPoints`, `computeWeightedLayoutPoints`, `desiredEdgeLength`, `buildGraphSVG`, all of `style.css`, `index.html` | Decides *where a vertex is drawn* and *how it looks*; consumes the data above but computes nothing new mathematically. |
 
 ---
 
-## Laplacian Matrix and Graph Visualization
+## 6. Complete User Workflow
 
-### What Is a Graph Laplacian?
+What actually happens, in order, when someone uses the calculator:
 
-For a simple, undirected, unweighted graph, the **Laplacian matrix** is defined as:
+1. The user types a whole number (1–100) into the **Matrix size (n)** field.
+2. On **Create Matrix** click (or **Enter** in that field), the size is validated (`createMatrix()`); an invalid size shows an error and creates nothing.
+3. If valid, an empty `n × n` grid of input cells is generated (`buildMatrixGrid`).
+4. The user types a real number into every cell (Tab / Enter / Arrow keys move between cells).
+5. The user clicks **Calculate Eigenvalues & Eigenvectors** (or presses Enter in the last cell, which triggers the same action).
+6. `runCalculation()` reads and validates every cell (`readMatrix()`) — any empty or non-numeric cell blocks calculation with an error message.
+7. The validated matrix is passed to `computeEigen(matrix, n)`.
+8. Internally, `eigenvaluesQR` reduces the matrix to Hessenberg form and runs the shifted-QR algorithm to find every eigenvalue (real or complex).
+9. `groupEigenvalues` clusters numerically-equal roots — cluster size = **algebraic multiplicity**.
+10. (Algebraic multiplicities are now known, from step 9.)
+11. For each distinct eigenvalue, `nullspace(matrix, n, eigenvalue)` computes a basis for `(A − λI)`'s null space — that basis **is** the eigenvector set for that eigenvalue.
+12. (Eigenvectors are now known, from step 11.)
+13. **Geometric multiplicity** = the number of eigenvectors returned in step 11 for that eigenvalue.
+14. Wherever geometric multiplicity is less than algebraic multiplicity, that eigenvalue is flagged **Defective**.
+15. `renderResults()` formats and displays the input matrix, every eigenvalue, its multiplicities, and its eigenvector(s).
+16. Independently, `renderGraphSection()` passes the *same* matrix to `laplacianAnalysis()`, checking the Laplacian rules (see [Section 9](#9-laplacian-detection)).
+17. If valid, `laplacianAnalysis` returns the extracted edges (with weights) and whether the graph is weighted.
+18. `classifyGraph()` assigns a structural type label (Kₙ, Pₙ, Cₙ, star, disconnected, etc.), if one applies unambiguously.
+19. `computeLayoutPoints` (unweighted) or `computeWeightedLayoutPoints` (weighted) computes where each vertex should be drawn.
+20. `buildGraphSVG()` renders the actual SVG: vertices, edges, and (for a weighted graph) weight labels.
+21. The user can now hover/click the graph, click **Copy Results** / **Copy Graph Info**, or click **Download Graph** — all working from the same computed results, with no recalculation needed.
 
-```
-L = D - A
-```
+If step 16's validation fails at any point, steps 17–20 simply do not run: the Graph Visualization card shows an explanatory message instead, and the eigenvalue results from steps 6–15 are displayed exactly as normal, completely unaffected.
 
-where **D** is the diagonal degree matrix (each diagonal entry is the number of edges touching that vertex) and **A** is the adjacency matrix (a 1 in position `[i][j]` means an edge connects vertex i and vertex j, 0 otherwise). The result is a symmetric matrix where every row sums to zero. The Laplacian's eigenvalues describe structural properties of the graph — for example, the eigenvalue 0 always appears, and it appears once for every connected component in the graph.
+---
 
-Whenever you calculate a matrix that fits this pattern, the calculator reconstructs the graph directly from the matrix entries and displays it automatically — you don't need to do anything extra. This same idea extends naturally to **weighted** graphs, covered in its own section below.
+## 7. Matrix Input System
 
-### How the Calculator Recognizes a Laplacian
+- **Supported size:** any whole number from **1×1 to 100×100** (`MIN_N = 1`, `MAX_N = 100` in `script.js`).
+- **Create Matrix workflow:** the size field does **not** regenerate the matrix as you type — you must click **Create Matrix**, or press **Enter** while the field is focused. This is intentional: it stops the grid from being rebuilt on every keystroke while typing a larger number like `100`.
+- **Numeric input:** integers, decimals (`0.75`), and negative values (`-2.5`) are all accepted in every cell. Validated against the pattern `^-?(\d+\.?\d*|\.\d+)$`.
+- **Empty / invalid values:** if any cell is left empty, or contains anything that doesn't parse as a valid real number, clicking Calculate shows an error and focuses the offending cell — calculation does not proceed.
+- **Large matrix warning:** creating a matrix of **50×50 or larger** shows the notice *"Large matrix detected. Calculations may take longer depending on your device."* (`LARGE_MATRIX_WARN_THRESHOLD = 50`) — verified: the notice is present at exactly 50×50 and absent at 49×49.
+- **Matrix generation behavior:** the grid is built fresh each time `Create Matrix` runs (values are cleared unless explicitly repopulated, as `Load Example` does). Navigating between cells supports Tab, Enter (moves right, then down, then triggers Calculate from the last cell), and the arrow keys.
 
-A calculated matrix is treated as a valid graph Laplacian only when **all** of the following hold:
+---
 
-- It is square (guaranteed by the matrix size you chose).
-- Every entry is a finite real number.
-- It is symmetric (`L[i][j] = L[j][i]` for every pair).
-- Every off-diagonal entry is zero or negative (a positive off-diagonal entry is never valid).
-- Every diagonal entry is non-negative.
-- Every row sums to zero (within a small numerical tolerance).
+## 8. Eigenvalue and Eigenvector System
 
-If any of these checks fail, the matrix is not treated as a Laplacian. The eigenvalue and eigenvector results are calculated and shown exactly as normal, and the Graph Visualization card explains specifically why the matrix was rejected, for example:
+This section explains the workflow at a system level; the full algorithmic implementation is in `MATHEMATICAL_CORE.md`.
 
-> "Graph visualization is unavailable: row 2 sums to 3, not 0; every row of a Laplacian matrix must sum to zero."
+- **Eigenvalue calculation** uses a shifted-QR algorithm (Hessenberg reduction + implicit-shift QR steps via complex Givens rotations, with deflation) — the same family of method production numerical libraries use, chosen because it handles repeated and clustered eigenvalues far more robustly than expanding a characteristic polynomial and finding its roots.
+- **Eigenvalue grouping** clusters numerically-close roots (a repeated eigenvalue emerges from the solver as several close-but-not-identical floating-point values) into one reported value per distinct eigenvalue.
+- **Algebraic multiplicity** is the size of that cluster — how many times the eigenvalue repeats as a root.
+- **Eigenvector calculation** solves `(A − λI)v = 0` via complex Gaussian elimination, for each distinct eigenvalue, returning a basis for its eigenspace.
+- **Geometric multiplicity** is the number of vectors in that basis — the eigenspace's dimension.
+- **Repeated eigenvalues:** algebraic multiplicity > 1. These may or may not be defective (see below).
+- **Defective matrices:** whenever an eigenvalue's geometric multiplicity is *less than* its algebraic multiplicity, the matrix does not have a full set of independent eigenvectors for that eigenvalue (it is not diagonalizable with respect to that eigenvalue), and the UI marks it **Defective**. Example: `[[2,1],[0,2]]` has eigenvalue `2` with algebraic multiplicity 2 but only one independent eigenvector (geometric multiplicity 1) — a classic Jordan-block example.
+- **Complex eigenvalues / eigenvectors:** the solver runs in complex arithmetic throughout, so a matrix like `[[0,-1],[1,0]]` (a 90° rotation) correctly returns the complex conjugate pair `λ = i` and `λ = −i`, each with its own complex eigenvector — no special-casing is needed.
 
-or:
+See **`MATHEMATICAL_CORE.md`** (Sections 3–9) for the exact algorithm, tolerances, shift-selection strategy, and the full source code.
 
-> "Graph visualization is unavailable: the matrix is not symmetric (L[1][2] = -2 but L[2][1] = -1), so it cannot represent an undirected graph."
+---
 
-These are informational messages, not errors, and the calculator never tries to silently "fix" or reinterpret an invalid matrix — the rest of the calculator continues to work normally either way.
+## 9. Laplacian Detection
 
-A matrix that passes these checks is automatically classified as either an **unweighted** or a **weighted** Laplacian (see below) — there is no separate toggle to set; the matrix itself determines which one you get.
+A matrix the user enters is treated as a valid graph Laplacian only when **every one** of these checks passes, in this order (`laplacianAnalysis()`):
 
-### How the Graph Is Reconstructed
+1. **Every entry is a finite real number.**
+2. **The matrix is symmetric** (`L[i][j] = L[j][i]`, within a small tolerance).
+3. **Every off-diagonal entry is zero or negative** (a positive off-diagonal entry is never valid).
+4. **Every diagonal entry is non-negative.**
+5. **Every row sums to zero**, within a numerical tolerance that scales with the matrix size.
 
-The graph is built directly from the matrix, never from the eigenvalues:
+The check for "square matrix" is implicit — the UI only ever builds `n × n` grids, so this is always satisfied by construction. The numerical tolerance for every comparison is `1e-6` (`LAPLACIAN_TOL`).
 
-- Each row/column index becomes a vertex, numbered starting from **1** (row/column 1 in the matrix is vertex 1, and so on).
-- For every off-diagonal entry `L[i][j] < 0` (with i < j), one edge is drawn between vertex i and vertex j, and its weight is the entry's absolute value. Because the matrix is symmetric, the mirrored entry `L[j][i]` is not read again, so each edge is created exactly once.
-- An off-diagonal entry of exactly `0` means there is no edge between that pair of vertices.
+**A. If the matrix IS a valid Laplacian:** the graph is reconstructed automatically and the Graph Visualization card shows the drawing, vertex/edge counts, and (where recognizable) a shape label — see [Section 10](#10-graph-system).
 
-For example, the Laplacian
+**B. If the matrix is NOT a valid Laplacian:** the Graph Visualization card shows a specific, human-readable explanation of *which* rule failed — for example:
 
-```
- 3 -1 -1 -1
--1  3 -1 -1
--1 -1  3 -1
--1 -1 -1  3
-```
+> *"Graph visualization is unavailable: row 2 sums to 3, not 0; every row of a Laplacian matrix must sum to zero."*
 
-reconstructs into 4 vertices, each connected to every other vertex — 6 edges in total (the complete graph K₄), each with weight 1.
+> *"Graph visualization is unavailable: the matrix is not symmetric (L[1][2] = -2 but L[2][1] = -1), so it cannot represent an undirected graph."*
 
-### Weighted Graphs
+**In both cases A and B, the eigenvalue/eigenvector calculation is completely unaffected** — it always runs, on every valid square matrix, whether or not that matrix is a Laplacian. Not every matrix produces a graph; the "Load Example" matrix `[[2,1],[0,3]]`, for instance, is not symmetric and therefore never produces one, while its eigenvalues (`2` and `3`) are still calculated and shown normally.
 
-A weighted graph assigns a numerical weight to each edge — for example, a distance, a cost, or a capacity. The calculator recognizes this directly from the matrix, with no separate setting to turn on: whenever the off-diagonal entries of a valid Laplacian aren't all exactly `-1`, the graph is treated as weighted.
+---
 
-For a weighted Laplacian:
+## 10. Graph System
 
-- A negative off-diagonal entry represents an edge, and **its absolute value is the edge's weight**. For example, `L[1][2] = -2` means an edge between vertex 1 and vertex 2 with weight `2`.
-- An off-diagonal entry of `0` means there is no edge, exactly as in the unweighted case.
-- Each diagonal entry equals the sum of the weights of every edge touching that vertex (its **weighted degree**), not just the number of edges.
-- The matrix must still be symmetric, and every row must still sum to zero, exactly as with an unweighted Laplacian — these two rules are what make a weighted Laplacian mathematically valid.
+Once `laplacianAnalysis` confirms a matrix is a valid Laplacian, it returns the graph as structured data — never as pixels or coordinates at this stage:
 
-For example, the matrix
+- **Vertices:** row/column index `i` (0-indexed in the matrix) becomes vertex `i + 1`.
+- **Edges:** for every off-diagonal entry `L[i][j] < 0` (checked only in the upper triangle, since the matrix is already known symmetric), an edge exists between vertex `i+1` and vertex `j+1`.
+- **Weights:** each such edge's weight is `|L[i][j]|`.
+- **Degree:** the number of edges touching a vertex (`computeDegrees`).
+- **Weighted degree:** the sum of the weights of the edges touching a vertex (`computeWeightedDegrees`) — only computed/shown when the graph is weighted; for an unweighted graph it would equal plain degree anyway.
+- **Connected components:** a union-find pass (`countComponents`) over the vertex set, used to detect a disconnected graph.
+- **Graph classification:** `classifyGraph` labels the graph Kₙ / Pₙ / Cₙ / star / disconnected / empty / single-vertex when the degree sequence and edge count unambiguously match one of those shapes; otherwise no shape label is invented.
 
-```
- 4 -2 -1 -1
--2  5 -3  0
--1 -3  4  0
--1  0  0  1
-```
+**MATHEMATICAL GRAPH DATA vs. GRAPH VISUALIZATION — the important distinction:**
 
-is a valid weighted Laplacian (every row sums to zero, and it's symmetric) representing 4 vertices and 4 weighted edges: 1–2 with weight 2, 1–3 with weight 1, 1–4 with weight 1, and 2–3 with weight 3. There is no edge between 2–4 or 3–4, because those off-diagonal entries are `0`.
+> Everything above (vertices, edges, weight = `|L[i][j]|`, degree, weighted degree, component count, shape label) is **mathematical graph data** — plain numbers and strings, computed once from the validated matrix.
+>
+> **None of it is where the graph is drawn on screen.** Turning that data into vertex coordinates, edge lengths, and an actual SVG picture is a separate, later step ([Section 13](#13-graph-layout-system)) that *reads* this data but never changes it. A weighted graph's edge weight is always exactly `|L[i][j]|`, regardless of how long that edge happens to be drawn.
 
-When a weighted Laplacian is detected, the Graph Visualization card:
+---
 
-- Labels the graph as **Weighted Graph**, or, when the underlying shape is confidently recognized, as **Weighted Complete Graph**, **Weighted Path Graph**, **Weighted Cycle Graph**, and so on — the same shape recognition used for unweighted graphs, just with a "Weighted" prefix.
-- Draws each edge's weight directly beside it, offset slightly from the line so the number stays readable rather than sitting on top of it.
-- **Draws each edge's length to reflect its weight** — a smaller weight draws as a visually shorter edge and a larger weight as a visually longer one, so the relative size of every weight is visible at a glance, not just readable from the labels. This is the one respect in which a weighted graph's layout differs from the unweighted case: an unweighted graph (every edge implicitly weight 1) still uses the fixed, equal-length shape templates described below, while a weighted graph stretches or compresses edges by weight while keeping the same vertices connected. The exact pixel length isn't meant to equal the weight number precisely — only its length *relative to the other edges* is meaningful, normalized so a handful of very large or very small weights can't blow up or collapse the drawing. If every edge happens to share the same weight, there's no relative difference to show, so the graph falls back to the plain equal-length layout, exactly like an unweighted graph.
-- Never changes which vertices are connected — the weight only affects how long an edge is drawn, never whether it exists.
+## 11. Unweighted Graphs
 
-#### Degree vs. Weighted Degree
+An unweighted graph is simply the special case where every extracted edge weight equals exactly `1` (`weighted === false`). The calculator recognizes and draws these shapes with a dedicated layout for each, rather than putting every graph on one generic circle:
 
-These are two different, related concepts:
-
-- **Degree** is the number of edges touching a vertex.
-- **Weighted Degree** is the sum of the weights of the edges touching a vertex.
-
-For an unweighted graph, every edge has weight 1, so the two values are always equal, and only degree is shown. For a weighted graph, they can differ, so clicking a vertex shows both — for example, "Vertex 1 — Degree: 3, Weighted Degree: 4."
-
-### Reading the Graph
-
-The Graph Visualization card shows:
-
-- **The graph itself** — vertices as numbered circles connected by straight edges, in a fixed, deterministic layout chosen from the graph's recognized shape (see below). The layout is the same every time for the same graph, so it never appears to "jump around." For a weighted graph, each edge's weight is drawn directly on it.
-- **Vertices** and **Edges** counts.
-- **Graph Type**, shown only when the shape can be identified with certainty, using standard mathematical notation with subscripts: **Complete Graph Kₙ**, **Path Graph Pₙ**, **Cycle Graph Cₙ**, **Star Graph K₁,ₙ₋₁**, **Disconnected Graph (X components)**, **Empty Graph (no edges)**, or **Single Vertex** — prefixed with "Weighted" for a weighted graph (for example, **Weighted Path Graph Pₙ**). If the graph doesn't match one of these recognizable shapes, an unweighted graph shows only the vertex/edge counts with no invented label, while a weighted graph still shows **Weighted Graph**, since the edge weights themselves remain useful information even without a recognized shape.
-- A small **Weighted Graph** badge appears next to the Graph Visualization heading whenever the current graph is weighted, so it's clear at a glance without reading every edge.
-- Disconnected graphs are drawn exactly as disconnected — the calculator never adds edges to force components together.
-
-### Layout by Graph Shape
-
-Rather than placing every graph on one generic circle, the calculator recognizes several common shapes directly from the reconstructed edges and draws each one the way it's normally drawn on paper. The matrix always determines the edges; the shape recognition below only ever changes *where* vertices are drawn, never *which* edges exist.
-
-| Recognized shape | Layout used |
+| Shape | How it's drawn |
 |---|---|
-| **Path graph** (Pₙ) | A straight horizontal line, with vertices placed left-to-right in the order they actually connect along the path — not necessarily their numeric order. |
-| **Cycle graph**, 4 vertices (C₄) | An axis-aligned square, one vertex per corner, in the order they connect around the cycle. |
-| **Cycle graph**, other sizes (C₃, C₅, C₆, …) | A regular polygon (triangle, pentagon, hexagon, and so on), vertices placed around it in the order they connect around the cycle. |
-| **Star graph** (K₁,ₙ₋₁) | The hub (the vertex connected to every other vertex) is placed dead center, with every leaf vertex arranged evenly around it. |
-| **Complete graph**, 4 vertices (K₄) | A triangle with a central vertex: three vertices form the outer triangle and the fourth sits at the centroid, connected to all three — the standard way K₄ is drawn. |
-| **Complete graph**, other sizes (K₃, K₅, K₆, …) | A symmetric regular polygon, one vertex per corner. |
-| **Disconnected graph** | Each connected component is placed in its own clearly separated region of the drawing (arranged in a grid), and every component is independently laid out using the same shape rules above — so a disconnected graph made of two paths, for example, draws two separate lines rather than mixing every vertex onto one shared shape. |
-| Anything else | A symmetric circular arrangement in vertex-number order, as a reliable general-purpose fallback. |
+| **Path graph** (Pₙ) — e.g. **P₄** | A straight horizontal line, vertices ordered left-to-right by their actual connection order along the path (not necessarily numeric order). |
+| **Cycle graph** (Cₙ) — e.g. **C₄** | 4-vertex cycles use an axis-aligned square (one vertex per corner); other sizes use a regular polygon. |
+| **Star graph** (K₁,ₙ₋₁) — e.g. **K₁,₃** | The hub (degree `n−1`) sits dead center; every leaf is placed evenly around it. |
+| **Complete graph** (Kₙ) — e.g. **K₃**, **K₄** | K₄ uses the classic "triangle with a center vertex" arrangement; other complete graphs use a symmetric regular polygon. |
+| **Disconnected graph** | Each connected component gets its own grid cell in the drawing, laid out independently with the same shape rules above — components are never mixed onto one shared shape. |
+| **Generic / unrecognized** | A symmetric circular arrangement in vertex-number order, as a reliable fallback for any shape that doesn't match one of the above. |
 
-Path and cycle detection follows the graph's actual connections (not just vertex numbering), so the drawing stays a clean, uncrossed line or ring even if the underlying matrix numbers the vertices out of order along the path or cycle.
+Path and cycle vertex ordering is derived from the graph's actual connections (a chain-tracing walk), not from raw vertex numbering, so the drawing is always a clean, uncrossed line or ring.
 
-The table above describes the **unweighted** layout, where every edge is drawn the same length. A weighted graph keeps the same shape recognition (a weighted path is still drawn as a line, a weighted star still has a centered hub, and so on) but adapts each shape so edge length reflects weight, without changing which vertices are connected:
+Verified: `K₃` (`[[2,-1,-1],[-1,2,-1],[-1,-1,2]]`) → 3 vertices, 3 edges, **Complete Graph K₃**. `P₄` (`[[1,-1,0,0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1,1]]`) → 4 vertices, 3 edges, **Path Graph P₄**. `K₁,₃` → 4 vertices, 3 edges, **Star Graph K₁,₃**. `C₄` → 4 vertices, 4 edges, **Cycle Graph C₄**. `K₄` (`[[3,-1,-1,-1],[-1,3,-1,-1],[-1,-1,3,-1],[-1,-1,-1,3]]`) → 4 vertices, 6 edges, **Complete Graph K₄**, eigenvalues `0, 4, 4, 4`.
 
-| Recognized shape (weighted) | How weight changes the layout |
+---
+
+## 12. Weighted Graphs
+
+A **weighted** graph is detected the moment any single extracted edge weight differs from `1` — there is no separate toggle; the matrix itself determines it (`laplacianAnalysis`'s `weighted` flag).
+
+- **Detection:** while extracting edges, if any weight `w = |L[i][j]|` differs from `1` by more than the numerical tolerance, the whole graph is flagged weighted.
+- **Weight extraction:** identical mechanism as the unweighted case — `w_ij = -L_ij`, for every negative off-diagonal entry. An unweighted graph is not a different code path; it is simply the case where every extracted weight is `1`.
+- **Mathematical meaning:** the weight is graph data (a distance, cost, or capacity the matrix encodes) — it has nothing to do with eigenvalues. **The calculator never uses eigenvalues to determine anything about the graph or its visualization** — the two pipelines are entirely independent (see [Section 5](#5-system-architecture)).
+- **Weighted degree:** the sum of a vertex's incident edge weights, shown alongside plain degree only for weighted graphs (e.g. "Vertex 1 — Degree: 3, Weighted Degree: 4.").
+- **How weights are displayed:** every weighted edge gets a numeric label drawn beside it (offset from the line so it doesn't sit on top of it), and hovering an edge shows a tooltip with the exact weight.
+
+**How weight affects the visualization — edge length:**
+
+> **Smaller edge weight → shorter visual edge. Larger edge weight → longer visual edge.**
+
+This mapping (`desiredEdgeLength`) is a bounded min-max normalization against the graph's own weight range — a handful of very large or very small weights cannot blow up or collapse the drawing, and the exact pixel length is not meant to equal the weight number; only its length *relative to the other edges in the same graph* is meaningful. If every edge in a weighted graph happens to share the same weight, there is no relative difference to show, so it falls back to the plain equal-length layout automatically.
+
+Behavior differs by recognized shape (see [Section 13](#13-graph-layout-system) for the exact functions):
+
+- **Weighted paths** — still one straight line; each segment's length along that line scales with its weight.
+- **Weighted cycles** — still a ring of the same radius; vertices are spaced *unevenly around the ring* (angular position scales with weight) so lower-weight edges pull their endpoints closer together along the ring and higher-weight edges push them apart — this keeps the ring clean and uncrossed at any size.
+- **Weighted stars** — the hub stays centered; each leaf's *distance from the hub* is exactly its edge's weight (normalized), rather than every leaf sitting on one fixed circle.
+- **Small weighted complete/generic graphs** (≤ 14 vertices in one connected component) — positioned with a lightweight, bounded, damped force simulation: edges act as springs pulled toward a weight-proportional rest length, vertices repel each other so nothing overlaps, seeded from the same shape-aware starting layout an unweighted graph would use.
+- **Large weighted graphs** (> 14 vertices, complete or unrecognized shape) — kept at the plain equal-length layout; once a graph is already dense enough to be visually hard to trace, stretching edges by weight would add noise, not clarity. Weight labels and hover tooltips remain the reliable way to read exact weights at that size.
+
+Verified: the weighted-K₄ matrix below produces edges 1–2=2, 1–3=1, 1–4=4, 2–3=3, 2–4=3, 3–4=1, and the rendered/downloaded SVG's measured pixel lengths were strictly ordered by weight (shortest for the two weight-1 edges, longest for the weight-4 edge) — see [Section 21](#21-important-verified-mathematical-examples).
+
+---
+
+## 13. Graph Layout System
+
+Layout is entirely separate from graph *data* (Section 10) — it only decides pixel coordinates, never which edges exist.
+
+**Unweighted path:** `computeLayoutPoints(n, edges, size, nodeRadius)` — dispatches each connected component (`componentsList`) to `detectComponentShape` (path / cycle / star / complete / generic) and then `layoutComponent`, which places vertices per the table in [Section 11](#11-unweighted-graphs). Multiple components are each given their own cell in a grid.
+
+**Weighted path:** `computeWeightedLayoutPoints(n, edges, size, nodeRadius)` — the weighted-graph counterpart, following the same component/grid structure, but with per-shape logic:
+
+| Component shape | Weighted layout function |
 |---|---|
-| **Path graph** | Still a straight line, but each segment's length along that line is scaled by its edge's weight, so the shortest-weight segment is the shortest stretch of the line and the longest-weight segment is the longest. |
-| **Cycle graph** | Still a ring of the same radius, but vertices are spaced unevenly around it — a lower-weight edge pulls its two vertices closer together along the ring, a higher-weight edge pushes them farther apart — so the ring stays a clean, uncrossed loop at any size while its arc lengths reflect weight. |
-| **Star graph** | The hub still sits dead center, but each leaf sits at a distance from the hub proportional to that leaf's edge weight, instead of all leaves sitting on one fixed circle. |
-| **Complete graph** (small) | Vertices are placed with a lightweight, bounded simulation — edges act like springs pulled toward a length proportional to their weight, while vertices gently repel each other so nothing overlaps — so a weighted K₄, for example, no longer has to be a perfect triangle-plus-center. |
-| **Complete or unrecognized graph** (large) | Kept at the plain equal-length layout. Once a graph is large and dense enough that individual edges are already hard to trace (see [Large and Dense Graphs](#large-and-dense-graphs)), stretching edges by weight on top of that would only add visual noise, not clarity — the weight labels and hover tooltips remain the reliable way to read exact weights at that size. |
+| Path | `layoutWeightedPath` — analytic placement along a line; segment length ∝ weight. |
+| Cycle | `layoutWeightedCycle` — analytic placement around a fixed-radius ring; angular spacing ∝ weight. |
+| Star | `layoutWeightedStar` — hub centered; leaf radius from hub ∝ weight. |
+| Complete / generic, ≤ 14 vertices | `layoutComponent` (shape-aware seed) followed by `forceDirectedLayout` (bounded, damped spring simulation; rest length per edge from `desiredEdgeLength`). |
+| Complete / generic, > 14 vertices | `layoutComponent` only (plain equal-length layout; no weight-based distortion). |
+| Any component, uniform weight | The whole graph defers entirely to `computeLayoutPoints` (the unweighted layout) — there is no relative weight difference to visualize. |
 
-### Graph Interaction
+`desiredEdgeLength(weight, minWeight, maxWeight, minLen, maxLen)` performs the actual weight → pixel-length mapping: min-max normalize the weight into `[0, 1]`, then map that into a `[minLen, maxLen]` pixel range — bounded regardless of how extreme the input weights are.
 
-- **Hover** (or keyboard-focus with Tab) a vertex to highlight it and every edge connected to it.
-- **Hover** an edge, or its weight label, to highlight that edge on its own — its weight label is emphasized at the same time, and a tooltip shows the edge and its weight (for example, "Edge 1-2, Weight: 2").
-- **Click** a vertex (or press Enter/Space while it's focused) to show its degree in a line below the graph — for example "Vertex 1 — degree 3" for an unweighted graph, or "Vertex 1 — Degree: 3, Weighted Degree: 4." for a weighted one.
-- These interactions add convenience; none of them are required to read the graph — the vertex/edge counts, graph type, and the drawing itself (including edge weights) are always visible without hovering or clicking anything.
+**Component handling** (both paths): a graph is split into connected components (`componentsList`/`countComponents`); a single component fills the whole drawing area, while multiple components are each assigned their own cell in an automatically-sized grid, so disconnected graphs never draw one component's edges crossing into another's space.
 
-### Download Graph
-
-Click **Download Graph** to save the current graph as a standalone `laplacian-graph.svg` file, containing only the graph drawing (vertices, labels, and edges) — not the rest of the page. For a weighted graph, the edge weight labels are included in the downloaded file exactly as shown on screen. SVG is a scalable, resolution-independent image format that any modern browser or image editor can open.
-
-### Copy Graph Information
-
-Click **Copy Graph Info** to copy a plain-text summary of the graph to your clipboard. For an unweighted graph:
-
-```
-Vertices: 4
-Edges: 6
-Graph Type: Complete Graph K₄
-
-Edges:
-1-2
-1-3
-1-4
-2-3
-2-4
-3-4
-```
-
-For a weighted graph, each edge line also includes its weight:
-
-```
-Vertices: 4
-Edges: 4
-Graph Type: Weighted Graph
-
-Edges:
-1-2: weight 2
-1-3: weight 1
-1-4: weight 1
-2-3: weight 3
-```
-
-### Large and Dense Graphs
-
-The graph feature supports the calculator's full matrix size range, 1×1 through 100×100. As graphs get larger and denser:
-
-- Vertex numbers are shown as permanent labels for smaller graphs, and on hover/focus only for graphs with more than roughly 45 vertices, to keep the drawing from becoming cluttered.
-- Edge weight labels follow the same threshold: for a weighted graph with more than roughly 45 vertices, weights are available by hovering an edge (via the tooltip) rather than as permanent on-graph labels, again to avoid clutter.
-- Edges are drawn with reduced opacity once a graph has many edges, so a very dense graph (for example, a complete graph with dozens of vertices) reads as a legible density pattern instead of a single solid, unreadable shape.
-- A short note appears under large or dense graphs explaining what changed — for example, that individual edges may be hard to distinguish visually, or that edge weights are shown on hover instead of as permanent labels. The vertex and edge counts and the graph type (when identifiable) always remain accurate and readable regardless of density.
-- The eigenvalue/eigenvector calculation itself is unaffected by graph size or density — the two features operate independently.
+**Unweighted layouts are entirely unaffected by any of this** — `buildGraphSVG` only ever calls `computeWeightedLayoutPoints` when `weighted === true`; an unweighted graph's layout call, and therefore its drawing, is identical to before weighted-graph support existed.
 
 ---
 
-## Interface Guide
+## 14. Graph Visualization and Interaction
 
-| Control | Purpose |
-|---|---|
-| Matrix Size (n) | Sets the dimension of the square matrix (1–100) |
-| Create Matrix | Builds the matrix input grid for the chosen size |
-| Calculate Eigenvalues & Eigenvectors | Computes and displays the eigenvalues and eigenvectors |
-| Load Example | Loads a built-in 2×2 example matrix |
-| Clear Matrix | Empties all cell values in the current matrix |
-| Copy Results | Copies the matrix and calculated results to the clipboard |
-| Copy Graph Info | Copies the vertex/edge summary of the reconstructed graph to the clipboard (including edge weights, for a weighted graph) |
-| Download Graph | Downloads the current graph as an SVG image file (including edge weight labels, for a weighted graph) |
+- **SVG generation** (`buildGraphSVG`) builds the drawing as real SVG DOM elements (`<svg>`, `<line>`, `<circle>`, `<text>`, `<g>`) — not a canvas bitmap or an external image.
+- **Vertices** are circles, numbered (for small/medium graphs — see below), colored from the page's own CSS custom properties so the graph matches the current light/dark theme.
+- **Edges** are straight lines between the vertex coordinates from Section 13.
+- **Labels:** vertex numbers are shown permanently for graphs up to ~45 vertices; above that, only on hover/focus, to avoid clutter.
+- **Weight labels:** for a weighted graph, each edge's weight is drawn as a small boxed number offset to one side of the edge — under the same ~45-vertex threshold as vertex labels; above it, the weight is available via hover only (see [Section 20](#20-testing-and-verified-behavior) for the verified density note text).
+- **Tooltips:** every edge and vertex has a native `<title>` tooltip (e.g. *"Edge 1-2 / Weight: 2"*, *"Vertex 1 (degree 3)"*), shown on hover by the browser.
+- **Hover behavior:** hovering a vertex highlights it and every edge touching it; hovering an edge (or its weight label) highlights that edge and its label together.
+- **Focus behavior:** Tab-focusing a vertex produces the same highlight as hovering it, for keyboard users.
+- **Click behavior:** clicking a vertex (or pressing Enter/Space while it's focused) reveals its degree in a line below the graph.
+- **Degree display:** for an unweighted graph, "Vertex 1 — degree 3." For a **weighted** graph: "Vertex 1 — Degree: 3, Weighted Degree: 4." — both numbers shown together, since they answer different questions.
+- **Copy Graph Info:** copies vertex count, edge count, graph type, and the full edge list to the clipboard — including each edge's weight, for a weighted graph (e.g. `1-2: weight 2`).
+- **Download Graph SVG:** serializes the currently-displayed SVG (exactly as rendered, including weighted layout and weight labels) into a standalone `laplacian-graph.svg` file.
 
----
-
-## Matrix Size and Large Matrices
-
-The calculator supports square matrices from **1×1 up to 100×100**. Because a matrix has n × n entries, larger sizes mean significantly more cells to fill in:
-
-- 10×10 = 100 entries
-- 50×50 = 2,500 entries
-- 100×100 = 10,000 entries
-
-When you create a matrix of 50×50 or larger, the calculator displays a notice:
-
-> "Large matrix detected. Calculations may take longer depending on your device."
-
-Large matrices are still fully supported, but filling in thousands of cells by hand is naturally slower, and the calculation itself takes noticeably longer as the size grows. A 100×100 matrix typically calculates in a few seconds on a modern device — it is not instantaneous, and performance depends on your device's hardware.
+None of these interactions are required to read the graph — vertex/edge counts, the graph-type label, and the drawing itself (including weight labels, where shown) are always visible without hovering or clicking anything.
 
 ---
 
-## Technology Stack
+## 15. User Interface
 
-- **HTML5** — page structure and layout
-- **CSS3** — styling, responsive layout, and light/dark theming
-- **JavaScript (vanilla, no frameworks)** — all interactivity, calculations, and graph rendering
-- **Inline SVG** — the graph visualization, generated and drawn directly in the browser
+The page (`index.html`) is a single static document with these sections, top to bottom:
 
-No external math, linear algebra, or graph/charting library is used. The eigenvalue and eigenvector computations (Hessenberg reduction, the shifted QR algorithm with complex-number support, and null-space calculation) and the Laplacian validation, graph reconstruction, and SVG drawing are all implemented directly in the project's own JavaScript. There is no backend, server, or database — the entire calculator runs client-side in the browser.
+- **Header** — hero card with the "CalcuSlay" brand mark and the page title/subtitle.
+- **"How it works"** — a 4-step at-a-glance summary card.
+- **Matrix Size section** — the size field and **Create Matrix** button.
+- **Matrix Entries section** — the generated input grid, plus **Calculate Eigenvalues & Eigenvectors**, **Load Example**, and **Clear Matrix** buttons, and a "Calculating…" indicator.
+- **Results section** (hidden until a calculation completes):
+  - **Input Matrix** card — a static, formatted redisplay of what was entered.
+  - **Eigenvalues & Eigenvectors** card — one card per distinct eigenvalue, with a **Copy Results** button.
+  - **Graph Visualization** card — the SVG drawing (or an explanatory unavailable-message), a "Weighted Graph" badge when applicable, **Copy Graph Info** and **Download Graph** buttons, and a density note for large/dense graphs.
+- **Feedback/messages** — a single error box (`role="alert"`) for input problems, and a large-matrix notice for 50×50+.
+- **Footer** — a one-line reminder that all calculations run locally.
 
----
-
-## How It Works
-
-1. The user selects a matrix size and clicks Create Matrix (or presses Enter).
-2. The website generates an empty grid of input cells for that size.
-3. The user enters a numeric value into every cell.
-4. When Calculate is clicked, JavaScript reads and validates the matrix values.
-5. The matrix is reduced to a simpler equivalent form, then processed with a numerical algorithm to find its eigenvalues.
-6. For each eigenvalue found, the calculator determines its multiplicity and computes its associated eigenvector(s).
-7. The eigenvalues, multiplicities, and eigenvectors are formatted and displayed on the page.
-8. Independently of that calculation, the same matrix is checked against the Laplacian rules described above. If it qualifies, its vertices and edges (and, for a weighted Laplacian, each edge's weight) are reconstructed and drawn as an SVG graph; if not, an informational message explaining why is shown in its place.
-
-All of this happens locally in the browser — no matrix data is ever transmitted anywhere.
+This document does not reproduce `style.css` rule-by-rule — see that file directly for exact colors, spacing, and typography. What matters structurally is that every interactive element above has a stable `id` that `script.js` binds to directly (no framework, no data-binding layer).
 
 ---
 
-## Project Structure
+## 16. Responsive and Accessibility Behavior
+
+- **Desktop layout:** full-width cards in a centered container.
+- **Mobile layout:** CSS breakpoints at `700px` and `560px` reflow the matrix grid, button rows, and graph card for narrow screens; verified down to ~375px wide with no horizontal overflow and no label clipping.
+- **Keyboard navigation:** Tab/Shift+Tab moves through controls; inside the matrix grid, Tab, Enter, and the Arrow keys all move between cells (`onCellKeydown`).
+- **Enter key:** pressing Enter in the size field triggers Create Matrix; pressing Enter in the last matrix cell triggers Calculate — both verified.
+- **Focus behavior:** all interactive elements have visible `:focus-visible` outlines; the graph's vertices are individually focusable (`tabindex="0"`) and keyboard-activatable (Enter/Space).
+- **ARIA / accessible labels:** a skip-link to `#main-content`; `aria-labelledby` on major sections; `role="alert"` on the error box; `role="status"` + `aria-live="polite"` on the calculating indicator and large-matrix notice; `role="img"` + a descriptive `aria-label` on the graph container (which updates to mention weights when the graph is weighted); `aria-live="polite"` on the vertex-degree readout; each matrix cell has its own `aria-label` ("Row 2, column 3"); each SVG vertex/edge has a native `<title>` tooltip as well as `role="button"` + `aria-label` on vertices.
+- **Reduced motion:** a `prefers-reduced-motion: reduce` media query is present in `style.css` for users who request less animation.
+- **Theme:** light/dark theme follows the OS-level `prefers-color-scheme` automatically — including the graph's own colors, which are read from CSS custom properties at render time so a graph rendered in dark mode is dark, not just the page around it.
+
+Only behavior actually present in the current `index.html`/`style.css`/`script.js` is listed above.
+
+---
+
+## 17. Project Structure
 
 ```text
 Eigenvalue & Eigenvector Calculator/
@@ -419,59 +358,180 @@ Eigenvalue & Eigenvector Calculator/
 ├── index.html
 ├── script.js
 ├── style.css
-└── README.md
+├── README.md
+└── MATHEMATICAL_CORE.md
 ```
 
-- **index.html** — the page structure and layout for the calculator
-- **style.css** — all visual styling, responsive behavior, and theming
-- **script.js** — the matrix interface logic and the eigenvalue/eigenvector calculation engine
-- **.gitattributes** — line-ending normalization settings for the repository
+| File | Purpose / responsibility | Does NOT control |
+|---|---|---|
+| **`index.html`** | Page structure: every section, button, input, and container the calculator uses; the fixed pieces of markup `script.js` fills in and reads from. | Styling, colors, layout math, or any calculation. |
+| **`style.css`** | All visual styling: colors, spacing, typography, responsive breakpoints, light/dark theming, focus states, reduced-motion behavior. | Any calculation, any DOM structure, any graph data. |
+| **`script.js`** | Everything interactive: matrix grid generation, input validation, the entire eigenvalue engine, the entire graph engine (validation, data, layout, SVG rendering), and all button/keyboard behavior. | Visual appearance (delegates to CSS classes it applies, but doesn't define how those classes look). |
+| **`README.md`** *(this file)* | Complete system-level documentation: what the app is, how it works end to end, how to use and deploy it. | Line-by-line mathematical derivations — see `MATHEMATICAL_CORE.md`. |
+| **`MATHEMATICAL_CORE.md`** | The mathematical/algorithmic reference: full source of the eigenvalue engine and the graph-data mathematics, with verified worked examples. | UI structure, styling, deployment, or anything not directly mathematical. |
+| **`.gitattributes`** | Line-ending normalization for the repository. | Anything runtime-related. |
 
 ---
 
-## Running It Locally
+## 18. Data Flow
 
-This is a fully static website with no build step and no dependencies to install. To run it on your own machine:
+**Mathematical calculation:**
 
-1. Download or clone this repository.
-2. Open the `Eigenvalue & Eigenvector Calculator` folder.
-3. Open `index.html` directly in a web browser.
-
-Alternatively, you can serve the folder with any simple local web server, for example:
-
-```bash
-# From inside the project folder
-python -m http.server 8000
+```
+Matrix input (validated n×n real array, from readMatrix())
+  → computeEigen(matrix, n)
+      → eigenvaluesQR(matrix, n)        [Hessenberg reduction + shifted QR]
+      → groupEigenvalues(roots)         [clusters -> algebraic multiplicity]
+      → nullspace(matrix, n, λ)         [per distinct eigenvalue -> eigenvectors]
+  → { value, multiplicity, vectors }  per eigenvalue
+  → formatted results rendered on the page
 ```
 
-Then visit `http://localhost:8000` in your browser.
+**Graph generation:**
+
+```
+Matrix (the same array)
+  → laplacianAnalysis(matrix, n)
+      → { ok:false, reason }                         (not a Laplacian -- no graph)
+      → { ok:true, edges:[[i,j,weight],...], weighted }
+  → computeDegrees(n, edges)  /  computeWeightedDegrees(n, edges)
+  → countComponents(n, edges)
+  → classifyGraph(n, edges, degrees)
+  → computeLayoutPoints(...)  or  computeWeightedLayoutPoints(...)
+  → buildGraphSVG(...)
+  → user interaction (hover / click / copy / download)
+```
 
 ---
 
-## Deployment
+## 19. Important Functions
 
-This project is a static site (HTML, CSS, and JavaScript only), so it can be deployed to any static hosting provider. It is currently deployed on **Netlify** at https://eigenvalueproj.netlify.app/.
+A high-level reference; full implementations (for the mathematical functions) are in `MATHEMATICAL_CORE.md`.
 
-To deploy your own copy on Netlify:
-
-1. Push this repository to GitHub.
-2. Create a new site on Netlify and connect it to the repository.
-3. Since there is no build step, leave the build command empty and set the publish directory to the project folder (the one containing `index.html`).
-4. Deploy — Netlify will serve the site directly.
-
-The same approach works on any other static host (GitHub Pages, Vercel, Cloudflare Pages, etc.), since the project has no server-side requirements.
+| Function | File | Purpose | Category |
+|---|---|---|---|
+| `eigenvaluesQR` | `script.js` | Shifted-QR eigenvalue solver (Hessenberg + Givens rotations, deflation). | Mathematical |
+| `groupEigenvalues` | `script.js` | Clusters numerically-equal roots; determines algebraic multiplicity. | Mathematical |
+| `nullspace` | `script.js` | Solves `(A − λI)v = 0`; returns eigenvectors, whose count is geometric multiplicity. | Mathematical |
+| `computeEigen` | `script.js` | Public entry point tying the three functions above together. | Mathematical |
+| `laplacianAnalysis` | `script.js` | Validates a matrix as a (weighted or unweighted) Laplacian; extracts edges and weights. | Mathematical / Data |
+| `computeDegrees` | `script.js` | Plain vertex degree from the edge list. | Data processing |
+| `computeWeightedDegrees` | `script.js` | Weighted vertex degree from the edge list. | Data processing |
+| `countComponents` | `script.js` | Connected-component count (union-find). | Data processing |
+| `classifyGraph` | `script.js` | Structural shape classification (Kₙ, Pₙ, Cₙ, star, disconnected, etc.). | Data processing |
+| `computeLayoutPoints` | `script.js` | Unweighted, shape-aware vertex coordinate layout. | Presentation |
+| `computeWeightedLayoutPoints` | `script.js` | Weighted vertex coordinate layout (analytic + bounded force simulation). | Presentation |
+| `desiredEdgeLength` | `script.js` | Normalizes a weight into a bounded pixel-length range. | Presentation |
+| `buildGraphSVG` | `script.js` | Builds the actual SVG graph drawing and its interaction handlers. | Presentation |
+| `runCalculation` | `script.js` | UI workflow: reads the matrix, calls `computeEigen` and the graph pipeline, renders results. | UI workflow |
+| `readMatrix` / `buildMatrixGrid` | `script.js` | Reads/validates cell input; generates the input grid. | UI workflow |
+| `copyResults` / `copyGraphInfo` / `downloadGraph` | `script.js` | Clipboard and file-export actions. | UI workflow |
 
 ---
 
-## Limitations & Notes
+## 20. Testing and Verified Behavior
 
-- This calculator uses floating-point numerical methods, not exact symbolic algebra. Results are typically accurate to several decimal places but may show very small rounding artifacts (for example, an extremely small value close to zero).
-- Eigenvalues that are very close together (numerically clustered) can be harder to separate precisely, as with any numerical eigenvalue solver.
-- Very large matrices (approaching 100×100) take noticeably longer to calculate and require entering a large number of values by hand.
-- All matrix entries must be real numbers; the matrix itself must be square (the interface only allows square matrices, from 1×1 to 100×100).
-- The calculator runs entirely in the browser using standard JavaScript, so performance depends on the device and browser being used.
-- Graph visualization supports **simple** graphs, both unweighted and weighted: undirected, with no self-loops and no multiple edges between the same pair of vertices, matching the symmetric, zero-row-sum Laplacian rules described above. Directed graphs and multigraphs are not recognized as valid Laplacians and will not produce a graph.
-- Edge weights must be positive numbers (a negative off-diagonal entry's absolute value). The calculator never invents or infers a weighted graph from a matrix that fails the Laplacian rules — if validation fails, no graph is shown, and the specific reason is explained instead.
-- Graph type labeling (Complete, Path, Cycle, Star, Disconnected, Empty, Single Vertex) only covers those specific, unambiguous shapes. An unweighted graph that doesn't match one of them is still drawn correctly, just without a type label; a weighted graph that doesn't match one still shows the generic **Weighted Graph** label, since the weights themselves remain informative even without a recognized shape. The vertex and edge counts are always shown either way.
-- The graph layout is a fixed circular arrangement; vertices cannot be manually dragged or rearranged. This keeps the layout deterministic and reliable at every size, including very large graphs, at the cost of custom positioning.
-- For graphs with a large number of edges, individual edges can be visually difficult to trace by eye even though every edge is drawn correctly — the vertex/edge counts and graph type remain accurate regardless.
+Every result below was obtained by actually running the current code (either the exact extracted mathematical functions in Node.js, or the live page in a headless browser) — none of it is invented or assumed.
+
+| Test | Verified result |
+|---|---|
+| 1×1 (`[7]`) | `λ = 7`, algebraic/geometric multiplicity 1. |
+| Distinct eigenvalues (`[[2,1],[0,3]]`, the Load Example matrix) | `λ = 2`, `λ = 3`, each multiplicity 1. |
+| Repeated, non-defective (`[[2,0],[0,2]]`) | `λ = 2`, algebraic 2, geometric 2 — not defective. |
+| Defective (`[[2,1],[0,2]]`) | `λ = 2`, algebraic 2, geometric **1** — flagged Defective. |
+| Complex eigenvalues (`[[0,-1],[1,0]]`) | `λ = −i` and `λ = i`, each multiplicity 1. |
+| Identity matrix (`3×3`) | `λ = 1`, algebraic/geometric multiplicity 3. |
+| Zero matrix (`3×3`) | `λ = 0`, algebraic/geometric multiplicity 3. |
+| Diagonal matrix (`[[5,0,0],[0,-2,0],[0,0,7]]`) | `λ = −2, 5, 7`, each multiplicity 1. |
+| K₃ Laplacian | `λ = 0, 3, 3`; vertices=3, edges=3, **Complete Graph K₃**. |
+| P₄ Laplacian | `λ = 0, 0.585786, 2, 3.414214`; vertices=4, edges=3, **Path Graph P₄**. |
+| K₁,₃ Laplacian | `λ = 0, 1, 1, 4`; vertices=4, edges=3, **Star Graph K₁,₃**. |
+| C₄ Laplacian | `λ = 0, 2, 2, 4`; vertices=4, edges=4, **Cycle Graph C₄**. |
+| K₄ Laplacian | `λ = 0, 4, 4, 4`; vertices=4, edges=6, **Complete Graph K₄**. |
+| **Weighted K₄** | `λ = 0, 5.763932, 10.236068, 12`; vertices=4, edges=6, **Weighted Complete Graph K₄**; edge lengths in the rendered/downloaded SVG strictly ordered by weight. |
+| **Weighted P₄** | `λ = 0, 1, 3, 8`; vertices=4, edges=3, **Weighted Path Graph P₄**; still a straight line, segment lengths ordered by weight. |
+| **Weighted C₄** | `λ = 0, 2.855148, 6.718356, 10.426496`; vertices=4, edges=4, **Weighted Cycle Graph C₄**. |
+| **Weighted star** | `λ = 0, 1.202521, 2.612831, 10.184648`; vertices=4, edges=3, **Weighted Star Graph K₁,₃**; leaf distance from hub ordered by weight. |
+| **Large weighted cycle** (50 vertices, weights cycling 1–6) | Renders as a clean, uncrossed ring with uneven vertex spacing reflecting weight; correctly classified **Weighted Cycle Graph C₅₀**; permanent weight labels correctly suppressed above ~45 vertices, with a density note and working hover tooltip. |
+| Disconnected graph (two separate edges) | `λ = 0, 0, 2, 2`; vertices=4, edges=2, **Disconnected Graph (2 components)**. |
+| Invalid Laplacian (`[[3,-2,-1],[-2,5,0],[-1,0,1]]`) | Eigenvalues still calculated and shown normally; graph rejected with *"row 2 sums to 3, not 0; every row of a Laplacian matrix must sum to zero."* |
+| Asymmetric matrix (`[[2,-2,0],[-1,3,-2],[0,-2,2]]`) | Rejected: *"the matrix is not symmetric (L[1][2] = -2 but L[2][1] = -1)..."* |
+| Invalid matrix sizes (`0`, `101`) | Both rejected with *"Matrix size must be a whole number between 1 and 100."*; no matrix is created. |
+| 100×100 creation | Creates exactly 10,000 input cells; a full calculation completed in a live browser run with zero console errors, producing correctly-formatted results. |
+| Enter-to-create | Pressing Enter in the size field builds the matrix grid, same as clicking Create Matrix. |
+| Enter-to-calculate | Pressing Enter in the last matrix cell triggers Calculate; verified against a K₃ Laplacian, which produced the correct graph. |
+| Graph download | The downloaded `.svg`'s edge coordinates matched the on-screen layout exactly, including weighted edge lengths and weight-label elements. |
+| Copy Graph Info | Clipboard content verified to include vertices, edges, graph type, and (for a weighted graph) each edge's weight, in the documented format. |
+| Console-error checks | Zero console or page errors across every test above, including the 100×100 run and the 50-vertex weighted graph. |
+
+---
+
+## 21. Important Verified Mathematical Examples
+
+**Weighted K₄** — the canonical example for this project:
+
+```
+ 7  -2  -1  -4
+-2   8  -3  -3
+-1  -3   5  -1
+-4  -3  -1   8
+```
+
+**Verified eigenvalues:**
+
+```
+0
+5.763932
+10.236068
+12
+```
+
+> `0, 4, 8, 16` is **incorrect** for this matrix — it does not satisfy `det(A − λI) = 0` for `λ = 4`, `8`, or `16`. The set above is the correct, independently-verified result. See `MATHEMATICAL_CORE.md`, Section 14, for the verification method.
+
+Edges: 1–2 = 2, 1–3 = 1, 1–4 = 4, 2–3 = 3, 2–4 = 3, 3–4 = 1 — topology K₄ (6 edges), but drawn with visibly different edge lengths per weight rather than the perfect symmetric triangle-plus-center an unweighted K₄ would use.
+
+**Weighted P₄:**
+
+```
+ 2  -2   0   0
+-2   5  -3   0
+ 0  -3   4  -1
+ 0   0  -1   1
+```
+
+Edges: 1–2 = 2, 2–3 = 3, 3–4 = 1. Verified eigenvalues: `0, 1, 3, 8`. Drawn as a straight line, 1—2—3—4, with the weight-1 segment shortest and the weight-3 segment longest.
+
+For the full set of additional verified examples (K₃, K₁,₃, C₄, K₄, weighted C₄, weighted star, identity, zero matrix, defective/complex-eigenvalue cases, etc.), see `MATHEMATICAL_CORE.md`, Section 14, and [Section 20](#20-testing-and-verified-behavior) above.
+
+---
+
+## 22. Limitations
+
+- **Numerical, not symbolic:** this calculator uses floating-point numerical methods (shifted QR, Gaussian elimination), not exact symbolic algebra. Results are typically accurate to several decimal places but may show very small rounding artifacts.
+- **Clustered eigenvalues:** eigenvalues that are very close together numerically can be harder for any numerical solver — including this one — to separate with full precision.
+- **Real-valued matrix input only:** every matrix entry must be a real number; the interface does not accept complex entries directly (only complex *results* are supported).
+- **Performance at large sizes:** a 100×100 matrix's calculation time varies with the specific matrix (how quickly its eigenvalues converge under shifted QR) — measured between roughly 2 and 9 seconds across different random 100×100 matrices on the machine used for testing; performance depends on the user's own device and browser.
+- **Square matrices only:** the interface only ever builds square grids (1×1 to 100×100); there is no non-square matrix support.
+- **Simple graphs only:** graph visualization supports simple, undirected graphs (no self-loops, no multiple edges between the same pair of vertices) — both weighted and unweighted. Directed graphs and multigraphs are not representable as a Laplacian under the rules in Section 9 and will not produce a graph.
+- **Edge weights must be positive:** a weight is always `|L[i][j]|` for a negative off-diagonal entry; the calculator never infers a weighted graph from a matrix that fails Laplacian validation.
+- **Graph classification is deliberately conservative:** only the specific, unambiguous shapes in Section 11 are labeled. A valid graph that doesn't match one of them is still drawn correctly (with weights, if applicable) but without an invented shape label — an unweighted graph shows only vertex/edge counts in that case, while a weighted graph still shows the generic "Weighted Graph" label, since the weights remain informative on their own.
+- **Layout is deterministic but not draggable:** vertices cannot be manually repositioned by the user. Unweighted graphs and the analytic weighted path/cycle/star layouts are fully deterministic (the same matrix always lays out the same way); the bounded force simulation used for small weighted complete/generic graphs is also deterministic (no randomness) but is an approximate physical relaxation, not an exact formula.
+- **Large, dense graphs are visually approximate by design:** past a certain size, individual edges become hard to trace by eye even though every one is drawn correctly, permanent labels are intentionally suppressed, and (for weighted graphs) edge length stops reflecting weight in favor of the plain equal-length layout — vertex/edge counts, the graph type, and hover tooltips remain accurate regardless of density.
+
+---
+
+## 23. Deployment
+
+This is a fully static site (HTML, CSS, and JavaScript only) with **no build step, no backend, and no database** — it runs entirely in the visitor's browser. It is currently deployed on **Netlify** at https://eigenvalueproj.netlify.app/.
+
+Required files for deployment: `index.html`, `script.js`, `style.css` (and, if you want the documentation to travel with the deployed copy, `README.md`/`MATHEMATICAL_CORE.md`, though those are not fetched by the page itself). To deploy your own copy on Netlify: push the repository to GitHub, create a new Netlify site connected to it, leave the build command empty, and set the publish directory to the folder containing `index.html` — then deploy. The same approach works on any other static host (GitHub Pages, Vercel, Cloudflare Pages, or simply opening `index.html` directly in a browser / serving it with `python -m http.server`), since there are no server-side requirements anywhere in the project.
+
+---
+
+## 24. Relationship Between Documentation Files
+
+This project intentionally has exactly two Markdown files, each with a distinct, non-overlapping purpose:
+
+- **`README.md`** *(this file)* — **complete documentation of the whole system**: what the application is, every feature, the full user workflow, the UI structure, deployment, and verified test behavior. It explains the mathematics and the graph engine *at a system level* — what each stage does and how it connects to the rest of the app — without reproducing the underlying algorithms line by line.
+- **`MATHEMATICAL_CORE.md`** — **mathematical and algorithmic documentation**, purpose-built to also serve as a research/thesis-suitable technical reference. It contains the actual current source code of the eigenvalue engine and the graph-data mathematics, explained in full algorithmic detail, plus a complete, copy-pasteable source-code appendix. It is not a second README and does not cover UI, deployment, or feature lists.
+- **The source code itself** (`index.html`, `script.js`, `style.css`) is the ultimate authority. Both documents describe the *current* implementation as of the same revision; if any statement in either document ever conflicts with what the code actually does, the code is correct and the documentation should be treated as needing an update, not the other way around.
