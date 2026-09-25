@@ -214,9 +214,14 @@ input:focus-visible {
   max-width: 40ch;
 }
 
-/* ----------------------------- Layout ----------------------------- */
-main {
-  padding: 28px 20px 60px;
+/* ----------------------------- Layout -----------------------------
+   `main` also carries the `.container` class for its max-width/centering,
+   so this rule is scoped as `main.container` (specificity 0,1,1) to
+   reliably beat `.container`'s own `padding: 0 20px` (0,1,0) for the
+   top/bottom values -- otherwise the higher-specificity class selector
+   silently wins and this padding never applies at all. */
+main.container {
+  padding: 18px 20px 32px;
 }
 
 .card,
@@ -225,8 +230,8 @@ main {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
-  padding: 20px 22px;
-  margin-bottom: 16px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
   transition: box-shadow var(--transition-med), border-color var(--transition-med), transform var(--transition-med);
 }
 .card:hover,
@@ -240,7 +245,8 @@ main {
 }
 
 .card h2,
-.info-card h2 {
+.info-card h2,
+#results-heading {
   margin: 0 0 10px;
   font-size: 1.1rem;
   font-weight: 700;
@@ -250,7 +256,7 @@ main {
 }
 
 .card h3 {
-  margin-top: 0;
+  margin: 0 0 10px;
   font-size: 1.02rem;
   font-weight: 700;
 }
@@ -430,10 +436,20 @@ main {
   display: none !important;
 }
 
-/* ----------------------------- Matrix input ----------------------------- */
+/* ----------------------------- Matrix input -----------------------------
+   text-align: center on these wrappers centers the inline-flex bracket
+   group when it's narrower than the card (small matrices/vectors) --
+   inline-flex boxes ignore `margin: auto` for horizontal centering, so
+   without this they sit flush left with a lot of dead space to the right.
+   Large matrices that already exceed the width still scroll normally. */
 .matrix-scroll {
   overflow-x: auto;
   padding: 6px 2px 14px;
+  text-align: center;
+}
+
+#input-matrix-display {
+  text-align: center;
 }
 
 .matrix-brackets {
@@ -642,10 +658,7 @@ main {
 
 /* ----------------------------- Results ----------------------------- */
 .results-section {
-  margin-top: 8px;
-}
-.results-section h2 {
-  font-size: 1.25rem;
+  margin-top: 6px;
 }
 .results-section .card {
   box-shadow: var(--shadow-card-hover);
@@ -665,14 +678,14 @@ main {
 
 .eigen-results {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .eigen-card {
   position: relative;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 20px 20px 18px;
+  padding: 18px 18px 16px;
   background: var(--color-bg);
   overflow: hidden;
   animation: fadeInUp 0.35s ease both;
@@ -697,9 +710,9 @@ main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 24px;
-  margin-bottom: 14px;
-  padding-bottom: 14px;
+  gap: 8px 24px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -755,6 +768,7 @@ main {
 .eigen-vectors-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
 }
 
@@ -763,6 +777,86 @@ main {
   color: var(--color-text-muted);
   font-size: 0.85rem;
   font-style: italic;
+}
+
+/* ----------------------------- Graph visualization ----------------------------- */
+.card--graph {
+  border-left: 3px solid var(--color-pink-btn);
+}
+
+.graph-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.info-notice--static {
+  margin-top: 0;
+}
+
+.graph-container {
+  max-width: 600px;
+  margin: 4px auto 10px;
+  aspect-ratio: 1 / 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.graph-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.graph-vertex-circle {
+  cursor: pointer;
+  transition: fill var(--transition-fast), stroke var(--transition-fast);
+}
+
+.graph-vertex {
+  cursor: pointer;
+}
+.graph-vertex:focus {
+  outline: none;
+}
+.graph-vertex:focus-visible {
+  outline: none;
+}
+.graph-vertex:focus-visible .graph-vertex-circle {
+  filter: drop-shadow(0 0 2px var(--color-pink));
+}
+
+.graph-vertex-label {
+  pointer-events: none;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  user-select: none;
+}
+
+.graph-edge {
+  cursor: pointer;
+  transition: stroke var(--transition-fast), stroke-width var(--transition-fast);
+}
+
+.graph-vertex-info {
+  min-height: 1.3em;
+  margin: 8px 0 0;
+  font-weight: 600;
+  color: var(--color-pink-dark);
+  text-align: center;
+}
+
+.graph-info {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+#graph-density-note {
+  text-align: center;
+  margin-top: 8px;
 }
 
 @keyframes fadeInUp {
@@ -779,7 +873,7 @@ main {
 /* ----------------------------- Footer ----------------------------- */
 .site-footer {
   position: relative;
-  padding: 22px 0 40px;
+  padding: 20px 0 32px;
   color: var(--color-text-muted);
   font-size: 0.85rem;
   text-align: center;
@@ -846,5 +940,14 @@ main {
   .eigen-card-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .graph-container {
+    max-width: 100%;
+  }
+  .graph-actions {
+    width: 100%;
+  }
+  .graph-actions .btn {
+    flex: 1 1 auto;
   }
 }

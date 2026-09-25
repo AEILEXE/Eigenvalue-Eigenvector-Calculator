@@ -20,7 +20,7 @@
       <span class="hero-glyph hero-glyph--tl" aria-hidden="true">&#955;</span>
       <span class="hero-glyph hero-glyph--br" aria-hidden="true">&#955;</span>
       <div class="hero-content">
-        <p class="brand-logo">Eigenvalue</p>
+        <p class="brand-logo">CalcuSlay</p>
         <h1>Eigenvalue &amp; Eigenvector Calculator</h1>
         <p class="site-subtitle">Calculate eigenvalues, eigenvectors, and multiplicities from any square matrix.</p>
       </div>
@@ -103,6 +103,26 @@
         <button type="button" id="copy-btn" class="btn btn-secondary btn-secondary--pink btn-small">Copy Results</button>
       </div>
       <div id="eigen-results" class="eigen-results"></div>
+    </div>
+
+    <div class="card card--graph">
+      <div class="results-card-header">
+        <h3>Graph Visualization</h3>
+        <div class="graph-actions">
+          <button type="button" id="copy-graph-btn" class="btn btn-secondary btn-secondary--green btn-small">Copy Graph Info</button>
+          <button type="button" id="download-graph-btn" class="btn btn-secondary btn-secondary--pink btn-small">Download Graph</button>
+        </div>
+      </div>
+
+      <p id="graph-unavailable" class="info-notice info-notice--static" hidden></p>
+
+      <div id="graph-wrap" hidden>
+        <p class="hint">Hover a vertex or edge to highlight it. Click a vertex to see its degree.</p>
+        <div id="graph-container" class="graph-container" role="img" aria-label="Graph reconstructed from the Laplacian matrix"></div>
+        <p id="graph-vertex-info" class="graph-vertex-info" aria-live="polite"></p>
+        <p id="graph-info" class="graph-info"></p>
+        <p id="graph-density-note" class="hint" hidden></p>
+      </div>
     </div>
   </section>
 

@@ -339,8 +339,18 @@
   var eigenResultsContainer = document.getElementById('eigen-results');
   var calculatingIndicator = document.getElementById('calculating-indicator');
 
+  var graphWrap = document.getElementById('graph-wrap');
+  var graphUnavailable = document.getElementById('graph-unavailable');
+  var graphContainer = document.getElementById('graph-container');
+  var graphInfo = document.getElementById('graph-info');
+  var graphVertexInfo = document.getElementById('graph-vertex-info');
+  var graphDensityNote = document.getElementById('graph-density-note');
+  var copyGraphBtn = document.getElementById('copy-graph-btn');
+  var downloadGraphBtn = document.getElementById('download-graph-btn');
+
   var currentN = 0;
   var lastResults = null; // holds { matrix, n, groups } for copy functionality
+  var lastGraph = null; // holds { n, edges, type } for the graph feature
 
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
@@ -354,6 +364,13 @@
     eigenResultsContainer.innerHTML = '';
     inputMatrixDisplay.innerHTML = '';
     lastResults = null;
+    graphWrap.hidden = true;
+    graphUnavailable.hidden = true;
+    graphContainer.innerHTML = '';
+    graphInfo.innerHTML = '';
+    graphVertexInfo.textContent = '';
+    graphDensityNote.hidden = true;
+    lastGraph = null;
   }
 
   /* ---------------- Matrix grid generation ---------------- */
@@ -667,6 +684,607 @@
     return div.innerHTML;
   }
 
+  /* ==========================================================================
+     Laplacian Matrix -> Graph Visualization
+     This feature is intentionally self-contained: it reads the same matrix
+     the eigenvalue engine reads, but never touches or depends on eigenvalue
+     results, so it cannot change the mathematical output above it.
+     ========================================================================== */
+  var LAPLACIAN_TOL = 1e-6;
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  /* A matrix L is treated as a simple-graph Laplacian (L = D - A) when it is
+     symmetric, every row sums to zero, every off-diagonal entry is 0 or -1,
+     and every diagonal entry equals the count of -1 entries in that row. */
+  function isValidLaplacian(matrix, n) {
+    if (!n || n < 1) return false;
+    var i, j;
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < n; j++) {
+        if (!isFinite(matrix[i][j])) return false;
+      }
+    }
+    for (i = 0; i < n; i++) {
+      for (j = i + 1; j < n; j++) {
+        if (Math.abs(matrix[i][j] - matrix[j][i]) > LAPLACIAN_TOL) return false;
+      }
+    }
+    for (i = 0; i < n; i++) {
+      for (j = 0; j < n; j++) {
+        if (i === j) continue;
+        var v = matrix[i][j];
+        if (Math.abs(v) > LAPLACIAN_TOL && Math.abs(v + 1) > LAPLACIAN_TOL) return false;
+      }
+    }
+    for (i = 0; i < n; i++) {
+      var offDiagCount = 0;
+      var rowSum = 0;
+      for (j = 0; j < n; j++) {
+        rowSum += matrix[i][j];
+        if (j !== i && Math.abs(matrix[i][j] + 1) <= LAPLACIAN_TOL) offDiagCount++;
+      }
+      var diag = matrix[i][i];
+      if (diag < -LAPLACIAN_TOL) return false;
+      if (Math.abs(diag - Math.round(diag)) > LAPLACIAN_TOL) return false;
+      if (Math.abs(diag - offDiagCount) > LAPLACIAN_TOL) return false;
+      if (Math.abs(rowSum) > LAPLACIAN_TOL * Math.max(1, n)) return false;
+    }
+    return true;
+  }
+
+  /* Edges come only from L[i][j] = -1 (i < j), so the symmetric L[j][i] = -1
+     entry never produces a second, duplicate edge. */
+  function buildGraphEdges(matrix, n) {
+    var edges = [];
+    for (var i = 0; i < n; i++) {
+      for (var j = i + 1; j < n; j++) {
+        if (Math.abs(matrix[i][j] + 1) <= LAPLACIAN_TOL) edges.push([i + 1, j + 1]);
+      }
+    }
+    return edges;
+  }
+
+  function computeDegrees(n, edges) {
+    var deg = new Array(n).fill(0);
+    edges.forEach(function (e) {
+      deg[e[0] - 1]++;
+      deg[e[1] - 1]++;
+    });
+    return deg;
+  }
+
+  function countComponents(n, edges) {
+    var parent = [];
+    for (var i = 0; i <= n; i++) parent[i] = i;
+    function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+    edges.forEach(function (e) {
+      var ra = find(e[0]), rb = find(e[1]);
+      if (ra !== rb) parent[ra] = rb;
+    });
+    var roots = {};
+    for (var v = 1; v <= n; v++) roots[find(v)] = true;
+    return Object.keys(roots).length;
+  }
+
+  var SUBSCRIPT_DIGITS = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉' };
+  function toSubscript(num) {
+    return String(num).split('').map(function (ch) { return SUBSCRIPT_DIGITS[ch] || ch; }).join('');
+  }
+
+  /* Only classifies a graph shape when the check is unambiguous; otherwise
+     returns null so the UI falls back to a plain vertex/edge count. Uses
+     standard mathematical notation (Kn, Pn, Cn, K1,n-1) with Unicode
+     subscripts for the vertex count. */
+  function classifyGraph(n, edges, degrees) {
+    var m = edges.length;
+    if (n === 1) return 'Single Vertex';
+    if (m === 0) return 'Empty Graph (no edges)';
+
+    var components = countComponents(n, edges);
+    if (components > 1) return 'Disconnected Graph (' + components + ' components)';
+
+    var maxEdges = (n * (n - 1)) / 2;
+    if (m === maxEdges) return 'Complete Graph K' + toSubscript(n);
+
+    var deg1Count = 0, deg2Count = 0, otherDeg = false, maxDeg = 0;
+    degrees.forEach(function (d) {
+      if (d === 1) deg1Count++;
+      else if (d === 2) deg2Count++;
+      else otherDeg = true;
+      if (d > maxDeg) maxDeg = d;
+    });
+
+    if (!otherDeg && m === n - 1 && deg1Count === 2 && deg2Count === n - 2) {
+      return 'Path Graph P' + toSubscript(n);
+    }
+    if (!otherDeg && m === n && deg2Count === n && n >= 3) {
+      return 'Cycle Graph C' + toSubscript(n);
+    }
+    if (m === n - 1 && maxDeg === n - 1 && deg1Count === n - 1) {
+      return 'Star Graph K' + toSubscript(1) + ',' + toSubscript(n - 1);
+    }
+    return null;
+  }
+
+  /* ---- Recognizable-shape layout ----
+     Rather than always arranging vertices on one plain circle, the layout
+     recognizes common graph shapes (path, cycle, star, complete, and each
+     connected component of a disconnected graph) and draws each with the
+     arrangement a textbook would use. This never changes the edge set --
+     it only decides where each vertex is drawn. */
+
+  function componentsList(n, edges) {
+    var parent = [];
+    for (var i = 0; i <= n; i++) parent[i] = i;
+    function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+    edges.forEach(function (e) {
+      var ra = find(e[0]), rb = find(e[1]);
+      if (ra !== rb) parent[ra] = rb;
+    });
+    var groups = {};
+    for (var v = 1; v <= n; v++) {
+      var r = find(v);
+      (groups[r] = groups[r] || []).push(v);
+    }
+    var list = Object.keys(groups).map(function (k) { return groups[k]; });
+    list.forEach(function (c) { c.sort(function (a, b) { return a - b; }); });
+    list.sort(function (a, b) { return a[0] - b[0]; });
+    return list;
+  }
+
+  /* Walks a degree-<=2 chain starting at `start`, always stepping to the
+     lowest-numbered unvisited neighbor -- used to recover the actual
+     path/cycle order from the edge list, which need not match vertex ID
+     order in the matrix. */
+  function traceChain(start, adjacency, vertexCount) {
+    var order = [start];
+    var visited = {};
+    visited[start] = true;
+    var current = start;
+    while (order.length < vertexCount) {
+      var neighbors = adjacency[current].slice().sort(function (a, b) { return a - b; });
+      var next = neighbors.filter(function (v) { return !visited[v]; })[0];
+      if (next === undefined) break;
+      order.push(next);
+      visited[next] = true;
+      current = next;
+    }
+    return order;
+  }
+
+  /* Identifies a single connected component's shape from its own vertices
+     and edges only (never from the whole graph), so each component of a
+     disconnected graph is classified and drawn independently. */
+  function detectComponentShape(vertexIds, subEdges) {
+    var n = vertexIds.length;
+    var m = subEdges.length;
+    if (n === 1) return { type: 'single' };
+
+    var adjacency = {};
+    vertexIds.forEach(function (v) { adjacency[v] = []; });
+    subEdges.forEach(function (e) {
+      adjacency[e[0]].push(e[1]);
+      adjacency[e[1]].push(e[0]);
+    });
+
+    var maxEdges = (n * (n - 1)) / 2;
+    if (m === maxEdges) return { type: 'complete', ids: vertexIds };
+
+    var deg1 = [], deg2Count = 0, maxDeg = 0, hub = null;
+    vertexIds.forEach(function (v) {
+      var d = adjacency[v].length;
+      if (d === 1) deg1.push(v);
+      if (d === 2) deg2Count++;
+      if (d > maxDeg) { maxDeg = d; hub = v; }
+    });
+
+    if (m === n - 1 && deg1.length === 2 && deg2Count === n - 2) {
+      return { type: 'path', order: traceChain(deg1[0], adjacency, n) };
+    }
+    if (m === n && deg2Count === n && n >= 3) {
+      var startId = vertexIds[0];
+      return { type: 'cycle', order: traceChain(startId, adjacency, n) };
+    }
+    if (m === n - 1 && maxDeg === n - 1 && deg1.length === n - 1) {
+      return { type: 'star', hub: hub, leaves: vertexIds.filter(function (v) { return v !== hub; }) };
+    }
+    return { type: 'generic', ids: vertexIds };
+  }
+
+  /* Places one component's vertices into a local (cx, cy, radius) budget
+     according to its detected shape, writing results into `pointsOut`
+     keyed by vertex ID. */
+  function layoutComponent(shape, vertexIds, cx, cy, radius, pointsOut) {
+    var n = vertexIds.length;
+    if (n === 1 || shape.type === 'single') {
+      pointsOut[vertexIds[0]] = { x: cx, y: cy };
+      return;
+    }
+
+    if (shape.type === 'path') {
+      var order = shape.order;
+      var span = radius;
+      order.forEach(function (v, i) {
+        var t = order.length === 1 ? 0.5 : i / (order.length - 1);
+        pointsOut[v] = { x: cx - span + t * 2 * span, y: cy };
+      });
+      return;
+    }
+
+    if (shape.type === 'cycle' && n === 4) {
+      var half = radius * 0.78;
+      var corners = [
+        { x: cx - half, y: cy - half },
+        { x: cx + half, y: cy - half },
+        { x: cx + half, y: cy + half },
+        { x: cx - half, y: cy + half }
+      ];
+      shape.order.forEach(function (v, i) { pointsOut[v] = corners[i]; });
+      return;
+    }
+
+    if (shape.type === 'cycle') {
+      shape.order.forEach(function (v, i) {
+        var angle = -Math.PI / 2 + (2 * Math.PI * i) / shape.order.length;
+        pointsOut[v] = { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+      });
+      return;
+    }
+
+    if (shape.type === 'star') {
+      pointsOut[shape.hub] = { x: cx, y: cy };
+      shape.leaves.forEach(function (v, i) {
+        var angle = -Math.PI / 2 + (2 * Math.PI * i) / shape.leaves.length;
+        pointsOut[v] = { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+      });
+      return;
+    }
+
+    if (shape.type === 'complete' && n === 4) {
+      var sin120 = Math.sin(2 * Math.PI / 3);
+      var positions = [
+        { x: cx, y: cy - radius },
+        { x: cx - radius * sin120, y: cy + radius * 0.5 },
+        { x: cx + radius * sin120, y: cy + radius * 0.5 },
+        { x: cx, y: cy }
+      ];
+      vertexIds.forEach(function (v, i) { pointsOut[v] = positions[i]; });
+      return;
+    }
+
+    /* Generic fallback (larger complete graphs, or any shape that doesn't
+       match a recognized pattern): a symmetric circle in vertex-ID order. */
+    vertexIds.forEach(function (v, i) {
+      var angle = -Math.PI / 2 + (2 * Math.PI * i) / n;
+      pointsOut[v] = { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+    });
+  }
+
+  /* Top-level layout: a single connected graph is drawn centered in the
+     whole canvas using its detected shape. A disconnected graph instead
+     gets one grid cell per component, so components are clearly separated
+     rather than interleaved on one shared circle. */
+  function computeLayoutPoints(n, edges, size, nodeRadius) {
+    var center = size / 2;
+    var components = componentsList(n, edges);
+    var pts = {};
+
+    if (components.length <= 1) {
+      var subEdgesAll = edges;
+      var shape = detectComponentShape(components[0] || [1], subEdgesAll);
+      var radius = n === 1 ? 0 : center - nodeRadius - 34;
+      layoutComponent(shape, components[0] || [1], center, center, radius, pts);
+      return pts;
+    }
+
+    var k = components.length;
+    var cols = Math.ceil(Math.sqrt(k));
+    var rows = Math.ceil(k / cols);
+    var cellW = size / cols;
+    var cellH = size / rows;
+
+    components.forEach(function (comp, idx) {
+      var col = idx % cols;
+      var row = Math.floor(idx / cols);
+      var cellCx = cellW * col + cellW / 2;
+      var cellCy = cellH * row + cellH / 2;
+      var cellRadius = Math.max(12, Math.min(cellW, cellH) / 2 - nodeRadius - 20);
+      var subEdges = edges.filter(function (e) { return comp.indexOf(e[0]) !== -1; });
+      var shape = detectComponentShape(comp, subEdges);
+      layoutComponent(shape, comp, cellCx, cellCy, cellRadius, pts);
+    });
+
+    return pts;
+  }
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(SVG_NS, tag);
+    if (attrs) {
+      for (var key in attrs) {
+        if (Object.prototype.hasOwnProperty.call(attrs, key)) el.setAttribute(key, attrs[key]);
+      }
+    }
+    return el;
+  }
+
+  /* Node size / label visibility scale down as vertex count grows so that
+     graphs up to 100 vertices stay legible instead of a solid blob. */
+  function graphVisualParams(n) {
+    if (n <= 12) return { r: 16, showLabels: true, strokeWidth: 1.6, fontSize: 13 };
+    if (n <= 25) return { r: 12, showLabels: true, strokeWidth: 1.3, fontSize: 10 };
+    if (n <= 45) return { r: 8, showLabels: true, strokeWidth: 1.0, fontSize: 7 };
+    if (n <= 70) return { r: 6, showLabels: false, strokeWidth: 0.9, fontSize: 0 };
+    return { r: 4.5, showLabels: false, strokeWidth: 0.7, fontSize: 0 };
+  }
+
+  /* Dense graphs (many overlapping straight edges) otherwise render as a
+     solid filled disc. Fading edges by count keeps the ring of vertices
+     and the overall density legible instead of a single opaque blob. */
+  function edgeOpacityForCount(edgeCount) {
+    if (edgeCount > 1500) return 0.08;
+    if (edgeCount > 600) return 0.18;
+    if (edgeCount > 200) return 0.35;
+    if (edgeCount > 60) return 0.55;
+    return 0.9;
+  }
+
+  function buildGraphSVG(n, edges, degrees) {
+    var size = 520;
+    var center = size / 2;
+    var params = graphVisualParams(n);
+    var pts = computeLayoutPoints(n, edges, size, params.r);
+    var baseOpacity = edgeOpacityForCount(edges.length);
+
+    var styles = getComputedStyle(document.documentElement);
+    function cssVar(name, fallback) {
+      var v = styles.getPropertyValue(name);
+      return v ? v.trim() : fallback;
+    }
+    var colorEdge = cssVar('--color-text-muted', '#5c6a62');
+    var colorNodeFill = cssVar('--color-surface', '#ffffff');
+    var colorNodeStroke = cssVar('--color-green', '#078055');
+    var colorLabel = cssVar('--color-text', '#1b2420');
+    var colorHighlight = cssVar('--color-pink', '#b84472');
+    var colorHighlightSoft = cssVar('--color-pink-soft', '#fbebf1');
+
+    var svg = svgEl('svg', {
+      viewBox: '0 0 ' + size + ' ' + size,
+      width: '100%',
+      height: '100%',
+      preserveAspectRatio: 'xMidYMid meet',
+      class: 'graph-svg',
+      focusable: 'false'
+    });
+
+    var titleEl = svgEl('title');
+    titleEl.textContent = 'Graph with ' + n + ' vert' + (n === 1 ? 'ex' : 'ices') + ' and ' + edges.length +
+      ' edge' + (edges.length === 1 ? '' : 's') + ', reconstructed from the Laplacian matrix.';
+    svg.appendChild(titleEl);
+    svg.appendChild(svgEl('rect', { x: 0, y: 0, width: size, height: size, fill: colorNodeFill, rx: 14 }));
+
+    var edgeLayer = svgEl('g', { class: 'graph-edges' });
+    var nodeLayer = svgEl('g', { class: 'graph-nodes' });
+    var adjacency = {};
+    for (var v = 1; v <= n; v++) adjacency[v] = [];
+
+    edges.forEach(function (e) {
+      var a = pts[e[0]], b = pts[e[1]];
+      var line = svgEl('line', {
+        x1: a.x.toFixed(2), y1: a.y.toFixed(2),
+        x2: b.x.toFixed(2), y2: b.y.toFixed(2),
+        stroke: colorEdge,
+        'stroke-width': params.strokeWidth,
+        'stroke-opacity': baseOpacity,
+        'stroke-linecap': 'round',
+        class: 'graph-edge'
+      });
+      var edgeTitle = svgEl('title');
+      edgeTitle.textContent = 'Edge ' + e[0] + '-' + e[1];
+      line.appendChild(edgeTitle);
+      edgeLayer.appendChild(line);
+      adjacency[e[0]].push(line);
+      adjacency[e[1]].push(line);
+    });
+
+    var vertexGroups = {};
+    for (var i = 1; i <= n; i++) {
+      var p = pts[i];
+      var g = svgEl('g', {
+        class: 'graph-vertex',
+        'data-vertex': i,
+        tabindex: '0',
+        role: 'button',
+        'aria-label': 'Vertex ' + i + ', degree ' + (degrees[i - 1] || 0)
+      });
+
+      var circle = svgEl('circle', {
+        cx: p.x.toFixed(2), cy: p.y.toFixed(2), r: params.r,
+        fill: colorNodeFill, stroke: colorNodeStroke, 'stroke-width': 2,
+        class: 'graph-vertex-circle'
+      });
+      var vTitle = svgEl('title');
+      vTitle.textContent = 'Vertex ' + i + ' (degree ' + (degrees[i - 1] || 0) + ')';
+      circle.appendChild(vTitle);
+      g.appendChild(circle);
+
+      if (params.showLabels) {
+        var text = svgEl('text', {
+          x: p.x.toFixed(2), y: p.y.toFixed(2),
+          'text-anchor': 'middle', 'dominant-baseline': 'central',
+          'font-size': params.fontSize,
+          fill: colorLabel, class: 'graph-vertex-label'
+        });
+        text.textContent = String(i);
+        g.appendChild(text);
+      }
+
+      nodeLayer.appendChild(g);
+      vertexGroups[i] = g;
+    }
+
+    svg.appendChild(edgeLayer);
+    svg.appendChild(nodeLayer);
+
+    function setEdgeHighlight(line, on) {
+      line.setAttribute('stroke', on ? colorHighlight : colorEdge);
+      line.setAttribute('stroke-width', on ? (params.strokeWidth + 1.4) : params.strokeWidth);
+      line.setAttribute('stroke-opacity', on ? 1 : baseOpacity);
+    }
+    function setVertexHighlight(vid, on) {
+      var g = vertexGroups[vid];
+      if (!g) return;
+      var circle = g.querySelector('circle');
+      circle.setAttribute('fill', on ? colorHighlightSoft : colorNodeFill);
+      circle.setAttribute('stroke', on ? colorHighlight : colorNodeStroke);
+      circle.setAttribute('stroke-width', on ? 3 : 2);
+      (adjacency[vid] || []).forEach(function (line) { setEdgeHighlight(line, on); });
+    }
+    function closestClass(target, className) {
+      return (target && target.closest) ? target.closest('.' + className) : null;
+    }
+
+    svg.addEventListener('mouseover', function (evt) {
+      var vg = closestClass(evt.target, 'graph-vertex');
+      if (vg) { setVertexHighlight(parseInt(vg.getAttribute('data-vertex'), 10), true); return; }
+      var el = closestClass(evt.target, 'graph-edge');
+      if (el) setEdgeHighlight(el, true);
+    });
+    svg.addEventListener('mouseout', function (evt) {
+      var vg = closestClass(evt.target, 'graph-vertex');
+      if (vg) { setVertexHighlight(parseInt(vg.getAttribute('data-vertex'), 10), false); return; }
+      var el = closestClass(evt.target, 'graph-edge');
+      if (el) setEdgeHighlight(el, false);
+    });
+    svg.addEventListener('focusin', function (evt) {
+      var vg = closestClass(evt.target, 'graph-vertex');
+      if (vg) setVertexHighlight(parseInt(vg.getAttribute('data-vertex'), 10), true);
+    });
+    svg.addEventListener('focusout', function (evt) {
+      var vg = closestClass(evt.target, 'graph-vertex');
+      if (vg) setVertexHighlight(parseInt(vg.getAttribute('data-vertex'), 10), false);
+    });
+
+    function activateVertex(vid) {
+      graphVertexInfo.textContent = 'Vertex ' + vid + ' — degree ' + (degrees[vid - 1] || 0) + '.';
+    }
+    svg.addEventListener('click', function (evt) {
+      var vg = closestClass(evt.target, 'graph-vertex');
+      if (vg) activateVertex(parseInt(vg.getAttribute('data-vertex'), 10));
+    });
+    svg.addEventListener('keydown', function (evt) {
+      if (evt.key !== 'Enter' && evt.key !== ' ') return;
+      var vg = closestClass(evt.target, 'graph-vertex');
+      if (vg) { evt.preventDefault(); activateVertex(parseInt(vg.getAttribute('data-vertex'), 10)); }
+    });
+
+    return svg;
+  }
+
+  function renderGraphSection(matrix, n) {
+    if (!isValidLaplacian(matrix, n)) {
+      graphWrap.hidden = true;
+      graphUnavailable.hidden = false;
+      graphUnavailable.textContent = 'Graph visualization is unavailable because this matrix is not a valid simple graph Laplacian.';
+      lastGraph = null;
+      return;
+    }
+
+    graphUnavailable.hidden = true;
+    graphWrap.hidden = false;
+    graphVertexInfo.textContent = '';
+
+    var edges = buildGraphEdges(matrix, n);
+    var degrees = computeDegrees(n, edges);
+    var svg = buildGraphSVG(n, edges, degrees);
+
+    graphContainer.innerHTML = '';
+    graphContainer.appendChild(svg);
+
+    var typeLabel = classifyGraph(n, edges, degrees);
+    var infoHtml = '<strong>Vertices:</strong> ' + n + ' &nbsp;•&nbsp; <strong>Edges:</strong> ' + edges.length;
+    if (typeLabel) infoHtml += '<br><strong>Graph Type:</strong> ' + escapeHtml(typeLabel);
+    graphInfo.innerHTML = infoHtml;
+
+    if (n > 60 || edges.length > 400) {
+      graphDensityNote.hidden = false;
+      graphDensityNote.textContent = 'This graph is large and dense. Vertex numbers are shown on hover or focus instead of as permanent labels, and individual edges may be hard to distinguish visually.';
+    } else {
+      graphDensityNote.hidden = true;
+    }
+
+    lastGraph = { n: n, edges: edges, type: typeLabel };
+  }
+
+  function buildGraphCopyText() {
+    if (!lastGraph) return '';
+    var lines = [];
+    lines.push('Vertices: ' + lastGraph.n);
+    lines.push('Edges: ' + lastGraph.edges.length);
+    if (lastGraph.type) lines.push('Graph Type: ' + lastGraph.type);
+    lines.push('');
+    lines.push('Edges:');
+    lastGraph.edges.forEach(function (e) { lines.push(e[0] + '-' + e[1]); });
+    return lines.join('\n') + '\n';
+  }
+
+  function copyTextToClipboard(text, btn, failureMessage) {
+    if (!text) return;
+    var restoreLabel = btn.textContent;
+    function onSuccess() {
+      btn.textContent = '✓ Copied';
+      btn.classList.add('btn--success');
+      window.setTimeout(function () {
+        btn.textContent = restoreLabel;
+        btn.classList.remove('btn--success');
+      }, 1500);
+    }
+    function onFailure() {
+      showError(failureMessage);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(onSuccess, onFailure);
+    } else {
+      try {
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        onSuccess();
+      } catch (e) {
+        onFailure();
+      }
+    }
+  }
+
+  function copyGraphInfo() {
+    if (!lastGraph) return;
+    copyTextToClipboard(buildGraphCopyText(), copyGraphBtn, 'Could not copy automatically. Please select and copy the graph information manually.');
+  }
+  copyGraphBtn.addEventListener('click', copyGraphInfo);
+
+  function downloadGraph() {
+    var svgSource = graphContainer.querySelector('svg');
+    if (!svgSource || !lastGraph) return;
+    var clone = svgSource.cloneNode(true);
+    clone.setAttribute('xmlns', SVG_NS);
+    var serializer = new XMLSerializer();
+    var source = '<?xml version="1.0" standalone="no"?>\r\n' + serializer.serializeToString(clone);
+    var blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'laplacian-graph.svg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  downloadGraphBtn.addEventListener('click', downloadGraph);
+
   /* ---------------- Calculate ---------------- */
   function runCalculation() {
     showError('');
@@ -680,6 +1298,7 @@
       try {
         var groups = computeEigen(matrix, currentN);
         renderResults(matrix, currentN, groups);
+        renderGraphSection(matrix, currentN);
       } catch (err) {
         showError('Something went wrong while calculating. Please check your matrix values and try again.');
       } finally {
