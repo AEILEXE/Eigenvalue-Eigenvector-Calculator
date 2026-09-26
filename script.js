@@ -381,6 +381,7 @@
   function buildMatrixGrid(n, values) {
     matrixContainer.innerHTML = '';
     if (!n || n < MIN_N) return;
+    matrixContainer.classList.toggle('matrix-scroll--large', n >= 20);
 
     var wrapper = document.createElement('div');
     wrapper.className = 'matrix-brackets';
@@ -554,6 +555,8 @@
   /* ---------------- Rendering results ---------------- */
   function renderStaticMatrix(container, matrix, n) {
     container.innerHTML = '';
+    var scroll = document.createElement('div');
+    scroll.className = 'matrix-display-scroll' + (n >= 20 ? ' matrix-display-scroll--large' : '');
     var wrapper = document.createElement('div');
     wrapper.className = 'matrix-brackets';
 
@@ -581,7 +584,8 @@
     wrapper.appendChild(bracketLeft);
     wrapper.appendChild(grid);
     wrapper.appendChild(bracketRight);
-    container.appendChild(wrapper);
+    scroll.appendChild(wrapper);
+    container.appendChild(scroll);
 
     var caption = document.createElement('p');
     caption.className = 'matrix-dimension-label';
