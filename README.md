@@ -19,7 +19,7 @@ The system solves one core mathematical problem: given a real square matrix `A`,
 This is intended for:
 
 - Students and instructors working through linear algebra by hand, who want to check their own eigenvalue/eigenvector calculations.
-- Anyone who needs a quick, no-install eigen-decomposition of a matrix — including matrices too large to comfortably solve by hand (up to 100×100).
+- Anyone who needs a quick, no-install eigen-decomposition of a matrix — including matrices too large to comfortably solve by hand (up to 500×500).
 - Anyone exploring graph theory who wants to see the graph a Laplacian matrix represents, without drawing it by hand.
 
 At a high level, the calculator works in two independent stages that both start from the same matrix the user typed in:
@@ -35,7 +35,7 @@ The full mathematical implementation behind stage 1 (the QR eigenvalue algorithm
 
 All of the following are implemented in the current version of the project:
 
-- **Matrix size input** — choose any whole-number size from 1×1 to 100×100.
+- **Matrix size input** — choose any whole-number size from 1×1 to 500×500.
 - **Matrix generation** — clicking Create Matrix (or pressing Enter in the size field) builds an empty input grid of that size.
 - **Matrix value input** — type any real number (integers, decimals, negatives) into each cell.
 - **Eigenvalue calculation** — for any square matrix, real or complex.
@@ -60,7 +60,7 @@ All of the following are implemented in the current version of the project:
 - **Keyboard interaction** — Tab/Enter/Arrow-key navigation between matrix cells, Enter-to-create, Enter-to-calculate.
 - **Responsive interface** — usable from a ~375px-wide phone screen up through desktop.
 - **Accessibility features** — skip link, ARIA labels/roles, live regions, visible focus states, keyboard-operable graph.
-- **Large matrix handling** — an informational notice at 50×50 and above; full support up to 100×100.
+- **Large matrix handling** — an informational notice at 50×50 and above; full support up to 500×500.
 
 ---
 
@@ -127,7 +127,7 @@ User Interaction (hover, click, copy, download)
 
 What actually happens, in order, when someone uses the calculator:
 
-1. The user types a whole number (1–100) into the **Matrix size (n)** field.
+1. The user types a whole number (1–500) into the **Matrix size (n)** field.
 2. On **Create Matrix** click (or **Enter** in that field), the size is validated (`createMatrix()`); an invalid size shows an error and creates nothing.
 3. If valid, an empty `n × n` grid of input cells is generated (`buildMatrixGrid`).
 4. The user types a real number into every cell (Tab / Enter / Arrow keys move between cells).
@@ -155,8 +155,8 @@ If step 16's validation fails at any point, steps 17–20 simply do not run: the
 
 ## 7. Matrix Input System
 
-- **Supported size:** any whole number from **1×1 to 100×100** (`MIN_N = 1`, `MAX_N = 100` in `script.js`).
-- **Create Matrix workflow:** the size field does **not** regenerate the matrix as you type — you must click **Create Matrix**, or press **Enter** while the field is focused. This is intentional: it stops the grid from being rebuilt on every keystroke while typing a larger number like `100`.
+- **Supported size:** any whole number from **1×1 to 500×500** (`MIN_N = 1`, `MAX_N = 500` in `script.js`).
+- **Create Matrix workflow:** the size field does **not** regenerate the matrix as you type — you must click **Create Matrix**, or press **Enter** while the field is focused. This is intentional: it stops the grid from being rebuilt on every keystroke while typing a larger number like `500`.
 - **Numeric input:** integers, decimals (`0.75`), and negative values (`-2.5`) are all accepted in every cell. Validated against the pattern `^-?(\d+\.?\d*|\.\d+)$`.
 - **Empty / invalid values:** if any cell is left empty, or contains anything that doesn't parse as a valid real number, clicking Calculate shows an error and focuses the offending cell — calculation does not proceed.
 - **Large matrix warning:** creating a matrix of **50×50 or larger** shows the notice *"Large matrix detected. Calculations may take longer depending on your device."* (`LARGE_MATRIX_WARN_THRESHOLD = 50`) — verified: the notice is present at exactly 50×50 and absent at 49×49.
@@ -456,7 +456,7 @@ Every result below was obtained by actually running the current code (either the
 | Disconnected graph (two separate edges) | `λ = 0, 0, 2, 2`; vertices=4, edges=2, **Disconnected Graph (2 components)**. |
 | Invalid Laplacian (`[[3,-2,-1],[-2,5,0],[-1,0,1]]`) | Eigenvalues still calculated and shown normally; graph rejected with *"row 2 sums to 3, not 0; every row of a Laplacian matrix must sum to zero."* |
 | Asymmetric matrix (`[[2,-2,0],[-1,3,-2],[0,-2,2]]`) | Rejected: *"the matrix is not symmetric (L[1][2] = -2 but L[2][1] = -1)..."* |
-| Invalid matrix sizes (`0`, `101`) | Both rejected with *"Matrix size must be a whole number between 1 and 100."*; no matrix is created. |
+| Invalid matrix sizes (`0`, `501`) | Both rejected with *"Matrix size must be a whole number between 1 and 500."*; no matrix is created. |
 | 100×100 creation | Creates exactly 10,000 input cells; a full calculation completed in a live browser run with zero console errors, producing correctly-formatted results. |
 | Enter-to-create | Pressing Enter in the size field builds the matrix grid, same as clicking Create Matrix. |
 | Enter-to-calculate | Pressing Enter in the last matrix cell triggers Calculate; verified against a K₃ Laplacian, which produced the correct graph. |
@@ -511,7 +511,7 @@ For the full set of additional verified examples (K₃, K₁,₃, C₄, K₄, we
 - **Clustered eigenvalues:** eigenvalues that are very close together numerically can be harder for any numerical solver — including this one — to separate with full precision.
 - **Real-valued matrix input only:** every matrix entry must be a real number; the interface does not accept complex entries directly (only complex *results* are supported).
 - **Performance at large sizes:** a 100×100 matrix's calculation time varies with the specific matrix (how quickly its eigenvalues converge under shifted QR) — measured between roughly 2 and 9 seconds across different random 100×100 matrices on the machine used for testing; performance depends on the user's own device and browser.
-- **Square matrices only:** the interface only ever builds square grids (1×1 to 100×100); there is no non-square matrix support.
+- **Square matrices only:** the interface only ever builds square grids (1×1 to 500×500); there is no non-square matrix support.
 - **Simple graphs only:** graph visualization supports simple, undirected graphs (no self-loops, no multiple edges between the same pair of vertices) — both weighted and unweighted. Directed graphs and multigraphs are not representable as a Laplacian under the rules in Section 9 and will not produce a graph.
 - **Edge weights must be positive:** a weight is always `|L[i][j]|` for a negative off-diagonal entry; the calculator never infers a weighted graph from a matrix that fails Laplacian validation.
 - **Graph classification is deliberately conservative:** only the specific, unambiguous shapes in Section 11 are labeled. A valid graph that doesn't match one of them is still drawn correctly (with weights, if applicable) but without an invented shape label — an unweighted graph shows only vertex/edge counts in that case, while a weighted graph still shows the generic "Weighted Graph" label, since the weights remain informative on their own.

@@ -321,7 +321,7 @@
      UI wiring
      ========================================================================== */
   var MIN_N = 1;
-  var MAX_N = 100;
+  var MAX_N = 500;
   var LARGE_MATRIX_WARN_THRESHOLD = 50;
 
   var sizeInput = document.getElementById('matrix-size');
@@ -395,6 +395,8 @@
     grid.style.gridTemplateColumns = 'repeat(' + n + ', minmax(56px, 1fr))';
     grid.setAttribute('role', 'group');
     grid.setAttribute('aria-label', n + ' by ' + n + ' matrix entry grid');
+    grid.addEventListener('keydown', onCellKeydown);
+    grid.addEventListener('input', onCellInput);
 
     var bracketRight = document.createElement('div');
     bracketRight.className = 'bracket bracket-right';
@@ -415,8 +417,6 @@
         if (values && values[i] && values[i][j] !== undefined) {
           input.value = values[i][j];
         }
-        input.addEventListener('keydown', onCellKeydown);
-        input.addEventListener('input', onCellInput);
         grid.appendChild(input);
       }
     }
@@ -473,7 +473,9 @@
   /* ---------------- Matrix size handling ---------------- */
   function updateLargeMatrixNotice(n) {
     if (n >= LARGE_MATRIX_WARN_THRESHOLD) {
-      largeMatrixNotice.textContent = 'Large matrix detected. Calculations may take longer depending on your device.';
+      largeMatrixNotice.textContent = n >= MAX_N
+        ? 'Very large matrices may require significant browser memory and computation time.'
+        : 'Large matrix detected. Calculations may take longer depending on your device.';
       largeMatrixNotice.hidden = false;
     } else {
       largeMatrixNotice.textContent = '';
