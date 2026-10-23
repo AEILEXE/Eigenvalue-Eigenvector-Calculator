@@ -4,6 +4,20 @@ A browser-based **Eigenvalue and Eigenvector Calculator**. Enter any square matr
 
 **Live Demo:** https://eigenvalueproj.netlify.app/
 
+## Screenshots & Examples
+
+### Example 4A — Weighted Graph Visualization
+
+Displays the weighted graph with numbered vertices, edge weights, and graph controls.
+
+![Weighted Graph Visualization](screenshots/example-4a-weighted-graph.png)
+
+### Example 4B — Graph Structure Visualization
+
+Shows the graph's numbered vertices and connections in a cleaner view.
+
+![Graph Structure Visualization](screenshots/example-4b-graph-structure.png)
+
 ---
 
 ## 1. Project Title
